@@ -1,0 +1,23 @@
+on touchEnd
+   global gUUID
+   set the blendLevel of me to 0
+   --
+   put fld "CopyrightInfo" of cd "StartAndSetup" into lCopyrightInfo
+   
+   put return & gUUID after lCopyrightInfo
+   
+   answer lCopyrightInfo with "OK"
+   
+   --visual effect flip left slow
+   --go cd "about" 
+end touchEnd
+   
+   
+on Touchstart
+   set the blendLevel of me to 70
+end Touchstart
+
+
+on MouseLeave
+   set the blendLevel of me to 0
+end MouseLeave

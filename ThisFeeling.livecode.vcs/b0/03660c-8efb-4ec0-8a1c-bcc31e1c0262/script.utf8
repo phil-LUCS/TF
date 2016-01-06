@@ -1,0 +1,9 @@
+on touchEnd
+   put item 1 of  the mouseloc into theH
+   put theH - (item 1 of the loc of me) into lWhichHalf
+   if lWhichHalf > 0 then 
+      RotateBodyView "left"
+   else
+      RotateBodyView "right"
+   end if
+end touchEnd

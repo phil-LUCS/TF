@@ -1,0 +1,46 @@
+{
+  "UUID": "5cc5b53c-4267-429d-98b0-0d36759e086c",
+  "class": "com.runrev.engine.card",
+  "customPropertySets": {
+    "cREVGeneral": {
+      "revUniqueID": "1329584575561"
+    },
+    "tRevGeneral": {
+      "tRevUniqueID": "1329584576826"
+    }
+  },
+  "properties": {
+    "altId": "0",
+    "backColor": "",
+    "backPattern": "",
+    "behavior": "",
+    "blendLevel": "0",
+    "borderColor": "",
+    "borderPattern": "",
+    "borderWidth": "2",
+    "bottomColor": "",
+    "bottomPattern": "",
+    "cantDelete": "true",
+    "dontSearch": "false",
+    "focusColor": "",
+    "focusPattern": "",
+    "foreColor": "",
+    "forePattern": "",
+    "hiliteColor": "",
+    "hilitePattern": "",
+    "id": "1265",
+    "ink": "srcCopy",
+    "mark": "false",
+    "name": "Configure",
+    "shadowColor": "",
+    "shadowOffset": "4",
+    "shadowPattern": "",
+    "showBorder": "false",
+    "textFont": "",
+    "textSize": "",
+    "textStyle": "",
+    "threeD": "true",
+    "topColor": "",
+    "topPattern": ""
+  }
+}

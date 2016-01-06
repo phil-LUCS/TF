@@ -1,0 +1,11 @@
+on touchend
+   global gSessionFolder
+   show grc "groove2" of grp "BodyMapBtn" of cd "StartAndSetup"
+   wait for 1 tick with messages
+   if gSessionFolder is empty then --we don't have any info about where to save stuff (perhaps this is the first time we've run in a while).
+      SetupNewSession
+   end if
+   visual effect "push left"
+   go cd "Somatic"
+   hide grc "groove2" of grp "BodyMapBtn" of cd "StartAndSetup"
+end touchend

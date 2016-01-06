@@ -1,0 +1,67 @@
+global gCurrentPainSpot
+global gAnimations
+global gAnimationExceptionsArr
+
+on TouchStart
+   
+end TouchStart
+
+
+on touchEnd
+   local lBtnTouched
+   put false into lBtnTouched
+   put "size1,size2,size3,size4,size5,throb1,throb2,throb3,throb4,throb5" into BtnList
+   repeat for each item BtnName in BtnList
+      if (the clickLoc is within the rect of btn BtnName) and (the visible of btn BtnName is true) then
+         put true into lBtnTouched
+         if btnName contains "throb" then
+            SetupThrobRate (char -1 of BtnName)
+            -- set the rectangle of grc "ThrobHighlight" to the rectangle of btn BtnName
+            SetPSThrob (char -1 of BtnName) 
+         else
+            --set the rectangle of grc "SizeHighlight" to the rectangle of btn BtnName
+            SetupSize (char -1 of BtnName)
+            SetPSSize (char -1 of BtnName)
+         end if
+         exit repeat
+      end if
+   end repeat
+   if lBtnTouched is not true then
+        CheckAndClearTextTouchInProgress
+   end if
+end touchEnd
+   
+
+on SetupThrobRate pWhatRate
+   if gAnimationExceptionsArr[the cpPSType of btn gCurrentPainSpot] is not true then
+      --pjDebug "set throbrate to " & pWhatRate
+      if pWhatRate > 0 and pWhatRate < 6 then --it shouldn't be possible to exceed this range, but just in case...
+         show grc "ThrobHighlight"
+         set the rectangle of grc "ThrobHighlight" to the rectangle of btn ("throb" & pWhatRate)
+         set the cpThrobRate of btn gCurrentPainSpot to pWhatRate
+      end if
+   else
+      hide grc "ThrobHighlight"
+   end if
+end SetupThrobRate
+   
+
+on SetupSize pWhatSize
+   set the rectangle of grc "SizeHighlight" to the rectangle of btn ("size" & pWhatSize)
+   set the cpSize of btn gCurrentPainSpot to pWhatSize
+   set the icon of btn gCurrentPainSpot to gAnimations[the cpPSType of btn gCurrentPainSpot][pWhatSize][1]
+   set the height of btn gCurrentPainSpot to the height of btn ("size" & pWhatSize)
+   set the width of btn gCurrentPainSpot to the width of btn ("size" & pWhatSize)
+end SetupSize
+
+
+on SetupPSLabel
+   put the cpPSLabel of btn gCurrentPainSpot into tTheLabel
+   if tTheLabel is empty then
+      put the cpPromptText of fld "PSLabel" of grp "PSProperties" into tTheLabel
+      set the textcolor of fld "PSLabel" of grp "PSProperties" to 150,150,150
+   else
+      set the textcolor of fld "PSLabel" of grp "PSProperties" to 0,0,0
+   end if
+   put tTheLabel into fld "PSLabel" of grp  "PSProperties"
+end SetupPSLabel

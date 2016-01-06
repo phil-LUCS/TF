@@ -1,0 +1,11 @@
+on touchEnd
+   if the label of me is "start" then
+      --start the animation
+      StartAnimation
+      set the label of me to "stop"
+   else
+      --stop the animation
+      StopAnimation
+      set the label of me to "start"
+   end if
+end touchEnd

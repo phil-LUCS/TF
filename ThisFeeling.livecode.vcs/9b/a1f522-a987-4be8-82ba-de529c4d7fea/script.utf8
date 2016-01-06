@@ -1,0 +1,13 @@
+on touchEnd
+   set the blendLevel of me to 0
+   visual effect flip right slow
+   go cd "StartAndSetup"
+end touchEnd
+
+on touchstart
+   set the blendLevel of me to 70
+end touchstart
+
+on mouseLeave
+   set the blendLevel of me to 0
+end mouseLeave

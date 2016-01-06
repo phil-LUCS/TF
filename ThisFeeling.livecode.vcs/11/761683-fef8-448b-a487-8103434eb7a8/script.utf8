@@ -1,0 +1,9 @@
+on mouseUp
+   global gNetworkIsConnected
+   if gNetworkIsConnected is true then
+      put "Connected" into lNetworkState
+   else
+      put "Disconnected" into lNetworkState
+   end if
+   answer lNetworkState with "OK"
+end mouseUp

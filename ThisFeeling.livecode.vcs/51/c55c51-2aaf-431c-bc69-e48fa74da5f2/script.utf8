@@ -1,0 +1,5 @@
+on touchend
+   set the blendlevel of grp "TrashHint" to 0
+   show grp "TrashHint"
+     send hidetrashhint to this cd in 4 seconds
+end touchend

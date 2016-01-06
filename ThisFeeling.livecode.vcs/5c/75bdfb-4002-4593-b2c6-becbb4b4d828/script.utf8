@@ -1,0 +1,3 @@
+on touchStart pTouchID
+      BodyTouchStart pTouchID,"front"
+end touchStart

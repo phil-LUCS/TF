@@ -1,0 +1,9 @@
+global gShowTwoViews
+
+on touchEnd
+   --don't do anything
+end touchEnd
+   
+on touchStart
+   --nor here
+end touchStart

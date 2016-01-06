@@ -1,0 +1,3 @@
+on touchStart pTouchID
+      BodyTouchStart pTouchID,(the cpViewImage of me)
+end touchStart

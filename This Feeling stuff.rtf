@@ -1,0 +1,244 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1265\cocoasubrtf210
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 LucidaGrande;}
+{\colortbl;\red255\green255\blue255;\red127\green0\blue127;\red0\green127\blue127;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww17880\viewh10340\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+
+\f0\b\fs48 \cf0 This Feeling stuff
+\b0\fs24 \
+\
+\
+
+\b\fs34 9th December 2015
+\b0\fs24 \
+\
+\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+
+\b\fs26 \cf0 9th December 2015
+\b0\fs24 \
+OK, I haven\'92t done anything with this for a while, but now I\'92m hoping to make an attempt to get it into Git - so that I can work on different branches for different uses - since at the moment I only have an iPad version of This Feeling (and we want to update a version for Manchester and we also want a Mac and PC version of the main version - phew!).\
+
+\b\fs26 \
+\
+\
+\
+18th September 2015
+\b0\fs24 \
+I\'92ll summarise the recent changes:\
+I have updated all the pain shapes (except for the fire one). Some now have multi-frame animations to give them a smoother appearance. Turned out the store application required an extra high-res graphic so I had to create one from the existing artwork (I still had the Photoshop file for it) and so I have updated all the logo images in the app build.\
+Discovered that the process I\'92d been using for ages, (an artwork file being zipped up alongside the app binary) is now rejected by Apple as an invalid binary. Now I just zip up the Payload folder.\
+Version submitted to Apple for App Store review.\
+\
+\
+\
+\
+
+\b\fs26 12th August 2015
+\b0\fs24 \
+I\'92ve started updating the pain shape graphics to add retina versions. The ellipse is the easiest, since that\'92s based on image export from LiveCode - I wrote a small stack to dump all the images. The new ellipse is antialiased and also available as a retina version. That\'92s the easy one. Now for the more difficult ones\'85\
+OK, I\'92ve done the slash and the query (the query is a question mark in Helvetica font). In order to get the size of the retina object to be twice that of the normal version I record the formatted width and height of the normal item and then set the width and height of the retina one to twice that of the normal one  - and twice the font size.\
+There\'92s now an updated cloud pain spot graphic.\
+\
+\
+\
+\
+
+\b\fs26 29th July 2015
+\b0\fs24 \
+I decided to look into implementing something to handle the large face sizes for the smaller face figures (the female and the girl). Rather than try and record the rect into which to draw the face, I came up with something simpler. I added a scale value to the 10th line of info retrieved for a specific figure. Lines 1..9 are the locs of the emotion when drawn on that figure, the 10th line is the scale to be applied to the emotion image. I\'92m using 0.8 for the boy, 0.7 for the girl, 0.8 for the female and 0.9 for the male. I modified the code that positions the face to set the image\'92s lockloc to false, it\'92s filename to empty then back to what it was and then scale its width and height to the round value of its true width and height * the scale factor. This looks a lot better than it did with unscaled faces. If we want to redraw any of the faces to make them less huge, then we can do that, but for now I think this will do.\
+\
+\
+\
+
+\b\fs26 2nd June 2015
+\b0\fs24 \
+Wendy wanted to (effectively) demo the old version of the app (before the zoom palette etc.) and it occurred to me that I had setup a boolean to make it hide, but not fully implemented it or setup a preference to allow you to control it. I also added a pref to make the \'93no pain\'94 button show up (or not). I rejigged the prefs panel to add these two new options and to put the rest into a better order. The features were successfully implemented - including if you\'92re not in body view when you turn off the zoom palette you are switched to it (otherwise there\'92d be no way of getting at it). I fixed a bug to do with single body view and left/right guidance - effectively the one overwrites the other. I have fixed this by displacing the guidance up by 16 pixels in the event that you switch to single body view. I spotted that there was a bug in the display of guidance for views other than the body ones. I\'92ve fixed this too. If you turn the zoom palette off I also now suppress the drawing of the mini versions of the pain spots and drawings (otherwise they just appear in a blank area where the zoom palette would normally be\'85).\
+\
+\
+
+\b\fs26 28th May 2015
+\b0\fs24 \
+After the meeting yesterday I have made a couple of changes to the app:\
+the feet view is now rotated so that it is (more or less) what you\'92d see if you look at your feet.\
+There\'92s a new feature - left and right guidance, that can be displayed over the top of any view. It is an option (default off).\
+\
+\
+\
+
+\b\fs26 27th May 2015
+\b0\fs24 \
+Last night I made a new version of the app available for testing. I\'92ve started thinking about data transfer and so I\'92ve setup something to allow me to test network connectivity. There are some buttons on the front card that are normally hidden when the app starts up. If you tap the left-most foot (from our point of view) of the child on the left this will toggle the visibility of those buttons. I will build a version of the app that includes this feature at some point and I will also look at getting some data to transfer to a web server.\
+I\'92ve changed the tests for whether a network connection can be made - the logic of the current handler looked a bit funny (I don\'92t know where I got the code from - presumably from some sample code or other). \
+\
+\
+
+\b\fs26 26th May 2015
+\b0\fs24 \
+Over the last several days I have been implementing some of the new features. I have successfully implemented mini versions of the main pain type icons - using grouped polygons and other graphics so that they scale well on retina displays. These are placed on the zoom palette when a pain spot is placed on any of the larger views (including the 2-up body view). At the moment I have not attempted to get it working for the one-up body view. I will need to consider how best that will work.\
+I also don\'92t have a mini icon for the fire pain spot icon\'85\
+Multiple pages work and the mini icons are removed and refreshed according to the usual rules (between page switches and if the chosen body representation is changed).\
+First thing to fix is if you use single-body view - there was no valid image width to use for scaling so it generated a divide by zero error. Now I setup the body views as though we were about to do two-up (in order to capture their width for scaling purposes), but then do one-up if that\'92s what we actually want.\
+\
+\
+\
+
+\b\fs26 21st May 2015
+\b0\fs24 \
+OK, Once again I haven\'92t kept this log up to date - D\'92Oh!\
+Anyway, the latest changes are as follows:\
+I\'92ve added mini previews of the drawings to the zoom palette so that you can see in context what you\'92re drawing. I\'92ve borrowed the code from my foot pain app (or at least I borrowed the concept and a little bit of the code). I\'92m not sure what to do about pain spots - they are not depicted as small versions. My first version of this only did mini drawings for views other than the body view (because the icon for the body view didn\'92t actually use a scaled version of the body view and so I couldn\'92t map the drawing onto it).\
+At the meeting a couple of weeks ago with Abbvie in Manchester, Amir suggested that it should also work with the body view (to be consistent) - I agree although it requires more images to be put together (and I\'92ll have to generate them from the app because my source images don\'92t come as a pair and even if they did they wouldn\'92t be positioned appropriately). I have now done that. There are new mini icons for the body views that change when you select the alternative body views. I don\'92t switch between clothed and unclothed though. I have updated the drawing code to handle the mini drawings for the body views.\
+Another thing Amir asked for was the removal of gremlin pain mode - that mode in Somatic Experiences where you can click to indicate the location of pain and then tap the palette to make a pain spot travel to that location. I will implement that for him but it will be a preference rather than a complete removal of the feature.\
+\
+\
+\
+
+\b\fs26 31st March 2015
+\b0\fs24 \
+I haven\'92t documented any of the changes I\'92ve made since the last entry. Basically I have added the zoomed views and switching between the 2 or 1-up body view and the hands/feet/neck/front of head. I have improved the exporting to make it work with the new setup. Most of the data storage arrays now have another dimension - along with a page index they have a view index - which has the possible values \'93FrontAndBack\'94, \'93Hands\'94, \'93Feet\'94, \'93Head_Back\'94 and \'93Head_Front\'94. \
+I have successfully implemented \'93move\'94 mode and included a feature to resize the tools palette depending on the mode (and prefs) settings.\
+David has requested the fully clothed figures be available and so I will now add support for them (I\'92ve copied them into place already). We also have a \'93no pain\'94 image - which is a little green lozenge shape with the words \'93no pain\'94 in it. It is a pain spot like the others, but it doesn\'92t cause the properties panel to come up when you\'92re placing one (it has no setting for size, throb or text label).\
+\
+\
+\
+
+\b\fs26 24th February 2015
+\b0\fs24 \
+During our Manchester meeting last week we discussed the bits and pieces that needed to be done for This Feeling to be submitted to the App Store. This included:\
+Move Mode (so that drawing, painspot placement and moving were three separate modes - rather than two as they are at the moment).\
+Improving the responsiveness of the turn graphic\
+Improving and retina-izing the pain spot graphics.\
+Making the child images more distinct from the parent ones in the chooser at the start of the program.\
+A no-pain pain-type.\
+\
+\
+
+\b\fs26 10th February 2015
+\b0\fs24 \
+Over the last several days I\'92ve implemented the annotated export for both email and photo library. The email now includes an attachment of the CSV file and snapshot image. The annotated email also has the data as a nice HTML formatted table. The drawings are always drawn with a blend level of 15 (so that you can see the figure underneath). I updated face 3 to have a flatter mouth and only very slightly turned up corners. Zooming is probably the next thing to implement. Rev have still not released a fully working 64-bit version of LiveCode (the previous one buggered up my submission of an update to Backdrop to the App Store). Once that\'92s available we ought to be able to be able to submit both TF and Backdrop to the store.\
+\
+\
+\
+\
+
+\b\fs26 5th February 2015
+\b0\fs24 \
+I have now got updated emotion faces from Jane (these are still being discussed so there may be a few little changes to be made to them). They are now incorporated into the app (I made a little tool to allow me to place the faces and record the locations into external text files which the app will load and use).\
+I have put together a better output system which will hopefully include a screen-snapshot of all the data (like I did for This Much!, but this time it uses a table field because the data is in table form). I am thinking of adding a small numbered blob to each pain shape and drawing so as to further annotate them.\
+The data output routine was a bit crap so I improved it and split the reporting of the pain spots and the drawings by making a function for each, which can be called separately (I need that because for the screenshot annotated view I need to be able to put the data in two differently formatted tables).\
+\
+\
+\
+
+\b\fs26 29th January 2015
+\b0\fs24 \
+OK, since the 27th I\'92ve managed to get the new retina people etc. incorporated into the program and can successfully pick up the face location info for displaying the emotions. I\'92ve added a feature to the gender chooser - if you change the image after you\'92ve placed some pains spots or done some drawings, those will be discarded (since the change of image may mean that they don\'92t fit properly on the figure any more). If the others think it should not do this it is really easy to switch it back. It uses the 
+\f1\fs22 ResetSomaticCard
+\f0\fs24  handler. Maybe this behaviour should be a preference?\
+Switching between tools in the tools palette makes the other kinds of object go transparent and not respond to touch events. If you switch to drawing mode, all pain spots go transparent and vice versa. This is so that if you want to you can draw near or on a painspot without causing it to move.\
+I\'92ve tied the gender selector into the emotions and body map buttons on the front card. To emphasise that you should choose a representation before doing either of the other two things.\
+Generated retina versions of the ellipse pain spot graphics. This was relatively easy since I wrote a small LiveCode program to generate the the original images I simply changed that to make double-sized versions of all the images\'85\
+\
+\
+\
+
+\b\fs26 27th January 2015
+\b0\fs24 \
+I have started updating This Feeling for retina displays and to make it available in the iTunes Store. I\'92ve created a standalone (a stack at the moment, but still\'85) which allows you to load an image and then place faces on it and record the outcome. I can use this to quickly set up new artwork (we\'92ve got some that Jane has done but there may be some changes required - and we want new versions of the emotions themselves anyway).\
+\
+\
+\
+\
+
+\b\fs26 18th November 2014
+\b0\fs24 \
+I've done all sorts of minor updates since February, but not documented them. D\'92Oh!\
+Anyway, the very latest change was to cope with David\'92s suggestion that I modify the \'93gremlin\'94 to make it something else. I\'92ve now done that. \
+Another recent addition was the ability to email the image and data.\
+\
+\
+
+\b\fs26 3rd February 2014
+\b0\fs24 \
+I've done a few updates of minor stuff since the last time I updated this log document - including adjusting the pain spot animation timings and creating a new circle animation which makes it throb by contracting concentrically (rather than the old animation which used horizontal then vertical contractions). \
+Today I was trying to fix the problem where touching the upper set of colour swatches resulted initially in the highlight graphic being drawn offset, then finally in the correct location. Turns out there was code in both the touch start and touch move handlers on the somatic card that didn't check to see if the colour bar was on show before checking if the mouse coords were inside it. I now properly test whether the swatches are on show using the 
+\f1\fs22 gEnableColourSwatches
+\f0\fs24  variable.\
+I'm still trying to decide how to approach the idea of moving graphics vs drawing new ones. I tried setting the blend level of a recently drawn graphic to see if that would be useful, but it ends up dulling the colours somewhat.\
+I think I'm going to have to use touch and hold to differentiate between drawing and dragging.\
+OK, I've got a way to highlight the difference (though it depends on whether it works well on the iPad, rather that in the simulator). What I do is set a graphic effect on the drawing when it is about to start moving and it keeps it until you let go of it. I've got two handlers to do this - 
+\f1\fs22 SetDropShadow
+\f0\fs24  and 
+\f1\fs22 ClearDropShadow
+\f0\fs24 . It looks quite neat.\
+\
+\
+\
+\
+
+\b\fs26 28th August 2013
+\b0\fs24 \
+I had a bit of feedback from Pauline, which made me think that my quick-n-dirty concept of two buttons per feature (one for a new emotions/body map and the other to continue) was a bit confusing (to say the least). Instead what I've now got is one "new" button - which effectively wipes memory clean of anything to do with a previous assessment and creates a new session and then a single button for Emotions and another for Body Map. I have also added to the handler called as a result of clearing all saved sessions - it also clears what was in progress in memory \strike \strikec0 and generates a new session ready for a new interview\strike0\striked0 . I decided that it should not create a new session, so that when you delete everything, what is reported to you is the fact that all sessions are now gone. I added a parameter to the handler 
+\f1\fs22 ClearAllInMemoryDataAndSetupNewSession
+\f0\fs24 , which controls the session creation bit. \
+\
+\
+\
+
+\b\fs26 13th August 2013
+\b0\fs24 \
+I've been finishing off the final bits and pieces to get the app ready for use in Manchester. It's working now, but I've added an alternative way of selecting the colour of your drawing - a colour block (group) which has all the colour swatches together. It's not quite the colour ramp that we had talked about, but I don't have access to one of those, so I had to make one myself. I am going to add a greyscale ramp as well and then that will be it for now. I've got the app saving the preferences that you choose (whether to use the swatches or not, whether you want the fire animation or not and whether you want two-up vs one-up body views). I've borrowed the code from "This Much!". There are still a couple of funnies. If you leave the page via the back button when the PSProperties panel is up, the screenshot includes that (even though I have told it to go and hide). I've added a delay with messages to see if that gives LiveCode time to update the screen. Seems to work.\
+Wendy reported a couple of problems. Basically, the emotions names were not being erased if you went back into the body map part, having emptied out some of them in the emotions part. I was not putting anything into the label field if that part of the emotion label array was empty - when of course I should do that because it indicates that something has been emptied. Fixed. I noticed that when you use the colour block to select a colour for a drawing, when you switch back to swatch mode, the highlight rectangle which is now visible had positioned itself over the part of the colour block you'd selected (although the block itself was now invisible). I've fixed that by not updating the location of the highlight rectangle if you're not in swatch mode. This will mean if you switch to swatch mode (funky!) the highlight rectangle will be over the last swatch you used and the colour will almost certainly not match the colour of the thickness lines. A minor issue and not one that I can necessarily fix. We might end up with colours in the block that have no corresponding swatch anyway.\
+Simple things I know, but I've added code to the rotate graphic so that it can determine which end of it you tapped. The idea is that the single view figure will then appear to turn that way\'85 The 
+\f1\fs22 RotateBodyView
+\f0\fs24  handler now takes a parameter 
+\f1\fs22 pWhichDirection
+\f0\fs24 , which is used to determine the direction of the wipe visual effect.\
+Discovered another one body view bug - you could select a face from the emotions palette when you didn't have the body view facing forwards. When that happened, the selected face stayed where it was and if you closed the emotions palette it was just hanging there. On switching to front view again an out of position face would appear near the body image (with the dangling selected face still there). What I've done is effectively disabled the emotions palette if:\
+1. its minimised or\
+2. it is open, but we're in one-up body mode and we're looking at the back view.\
+Wendy spotted another bug - hitting the back button while the keyboard is up leads to the keyboard close message getting passed along a bit late - so the field is not on the card by the time it checks - hence a chunk error. I now test in the keyboard close handler to see if the thing I'm editing exists in the current context. If it doesn't then I ignore it. I ought to check to see which card it's on and close it there. I now defocus before we leave the card, which should cause the keyboard to shut down in the context of the card. That seems to work but I send in time in order to do the final closing of the field, so I have now explicitly referenced the field in question in that handler and that seems to work now.\
+I tested the app with an external keyboard and it seems to work ok.\
+\
+\
+\
+
+\b\fs26 8th August 2013
+\b0\fs24 \
+I've started coding to take screenshots between pages (only if the page is dirty of course). I may have to refine my definition of dirty too and make sure it doesn't happen when it doesn't need to.\
+I was a bit concerned over the CPU load caused by the program. I thought that when it was in the background it might be doing something stupid, but I ran the Instruments measurement tool and although the app does use a lot of cpu when it's running (18-35% is typical), it uses none when its done. It also doesn't use that much RAM. I was quite surprised.\
+OK, what I've done is slightly increase the time between animation ticks - I had upped it to 20ms from 25ms yesterday. I've now set it to 22ms and we'll see what that does. I've also updated the animation routine not to try to do anything with buttons that are not visible\'85 D'Oh!\
+I've now updated the code to take snapshots, if the page is dirty, between page moves, including using the back button to return to the 1st card. I should probably do it when we go into the background too. What I've done so far seems to work a lot better in the simulator. I'll make a standalone and try that next.\
+So close\'85\
+I found that, because I was using 0..4 for throb rates, although recording them as 1..5 (and using buttons labelled "throb1".."throb5" that somewhere along the way the two were becoming out of sync - such that if you selected a throb for a painspot and then came back to it later, it's throb rate had become one less, without a change in speed of course or anything else. I've now modified the code so that, as far as I can tell, the whole thing uses 1..5, it's only in the calculation of the number of ticks that I take 1 off the throb rate.\
+The PSPreferences group was messed up because the throb rates of those buttons were hardcoded 0..4. I've now fixed them as 1..5. I also realised that because I hide and show the PSPreferences group my test for invisible buttons that should not be animated would not work. When you ask for the visible of a button which is part of a group, you will be told true, even if the button is invisible due to the group being invisible. Fortunately there is an answer - you can use "effective visible" which is true only if you can actually see it (though I think even that ignores the blend level of an item or group). I've changed my test in the 
+\f1\fs22 CheckAnimation
+\f0\fs24  handler to use 
+\f1\b\fs22 if
+\b0  \cf2 the\cf0  \cf3 effective\cf0  \cf3 visible\cf0  \cf2 of\cf0  \cf2 btn\cf0  theBtn \cf2 is\cf0  \cf2 true\cf0  
+\b then
+\b0  
+\f0\fs24 . This should work (for non grouped objects the effective visible is the same as the normal "visible").\
+\
+\
+\
+\
+
+\b\fs26 7th August 2013
+\b0\fs24 \
+The original blue of the tool palette was 
+\f1\fs22 233,235,250
+\f0\fs24 \
+I've changed it to 
+\f1\fs22 227,221,248
+\f0\fs24 , which is a tad more purple (and a little darker).\
+OK, that didn't work (I changed it so that the lightest grey drawing colour would show up, now that I colour the lines in the palette, but it actually got worse) so I have changed it back to what it was, and slightly darkened the lightest drawing grey.\
+I'm adding the remainder of the pain shapes, having added ellipse, spikes and itchy, yesterday. The ones I'm left with have no animated representations - which I'm wondering what I should do about. One idea with the slash is that the different animated versions are instead used to display variations - in this case angle. For the question mark, I can't think of any variations that I need (other than size).\
+\
+Improvement on IMS - pain shapes that have no animated representations (right now I've only got slash that has this property is now represented in the list on the animation setup card by preceding the name with a "*". When those load, the name of the type is placed in an array that holds the exceptions to animated pain spots. When the pain spot properties palette is drawn for one of this type of pain spot, no throbometer is displayed.\
+Built a version of the app that would attempt to draw each page in turn and screenshot it - this is called as you leave the SE card by virtue of the back button. I found though that when I tried this that some of the pain spots wouldn't show up on the printout - I don't think they'd had enough time to become visible. Instead I'm going to try doing a screenshot if the page is dirty as we move between pages.\
+\
+\
+\
+}

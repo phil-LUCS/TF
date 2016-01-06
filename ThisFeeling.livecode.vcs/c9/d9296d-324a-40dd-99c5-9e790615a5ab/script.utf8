@@ -1,0 +1,11 @@
+on touchstart
+   set the foregroundColor of me to 153,153,153
+end touchstart
+
+
+on touchEnd
+   set the foregroundColor of me to 26,0,186
+   DoStuffBeforeWeLeaveThisCard
+   visual effect push right
+   go cd "StartAndSetup"
+end touchEnd

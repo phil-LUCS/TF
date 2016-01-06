@@ -1,0 +1,10 @@
+on touchEnd
+   SPrefsTouch 7
+end touchEnd
+
+
+on mouseup
+   if not mob() then
+      send touchend to me
+   end if
+end mouseup

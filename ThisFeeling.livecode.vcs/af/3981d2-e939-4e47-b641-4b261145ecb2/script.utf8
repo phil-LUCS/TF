@@ -1,0 +1,168 @@
+global gEmailOptionsEnabled, gMailToList, gMostRecentScreenShotArr,gMostRecentDataFileArr, gCurrentPage, gCurrentView
+
+constant cViewList = "FrontAndBack,hands,feet,head_back,head_front"
+
+on touchstart
+   set the blendLevel of me to 70
+end touchstart
+
+
+on touchEnd
+   constant cSaveToPhotoLibrary = 1
+   constant cSaveToPhotoLibraryAnnotated = 2
+   constant cExportAsEmail = 3
+   constant cExportAsEmailAnnotated = 4
+   
+   
+   local tChosenOption, tSourceRect, tAnnotateOutput, tScreenshotList, tScreenshotFile, tExtraTag
+   set the blendLevel of me to 0
+   
+   QuicklyHidePSPropsPaletteAndDeselectCurrentPainSpot
+   
+   put "Save current image to photo library" & return & "Save current image to photo library (annotated)" & return & \
+         "Export all images as an email..." & return & "Export all images as an email (annotated)..." into lOptions
+   mobilepick lOptions,0,"cancelDone"
+   if the result is not 0 then
+      put the result into tChosenOption
+      
+      SaveCurrentPageAndViewPainSpotInfo
+      SaveCurrentPageAndViewDrawingInfo
+      
+      if tChosenOption is among the items of (cSaveToPhotoLibraryAnnotated,cExportAsEmailAnnotated) then
+         put true into tAnnotateOutput
+         AnnotateAllItems
+      else
+         put false into tAnnotateOutput
+      end if
+      
+      FadeInDrawings
+      FadeInPainSpots
+      
+      --save the files of data for access via iTunes (we can use the snapshot to attach to our email)
+      TakeScreenShot --updates gMostRecentScreenShotArr
+      SavePageAndViewData gCurrentView,true --updates the relevant section of gMostRecentDataFileArr & output into fld "Report"
+      
+      
+      switch tChosenOption
+         --
+         -- these options output all the views you've annotated
+         --
+         case cExportAsEmail
+         case cExportAsEmailAnnotated
+            
+            put "This Feeling Session snapshot" into tSubject
+            put empty into tTo
+            put empty into tCCs
+            put empty into tBCCs
+            
+            put CompileOutputData(tAnnotateOutput) into tBody --in HTML if we have chosen an annotated output
+            
+            --Deal with all the images first
+            put 1 into tAttachmentCount
+            put the keys of gMostRecentScreenShotArr[gCurrentPage] into tScreenshotList --list of screenshot items in the array for this page
+            repeat for each line aView in tScreenshotList --get the view name of each screenshot
+               put gMostRecentScreenShotArr[gCurrentPage][aView] into tScreenshotFile --retrieve the filename
+               put tScreenshotFile into tAttachment[tAttachmentCount]["file"] 
+               put "image/png" into tAttachment[tAttachmentCount]["type"] 
+               put "This Feeling" && aView && ".png" into tAttachment[tAttachmentCount]["name"] 
+               add 1 to tAttachmentCount
+            end repeat
+            
+            put CompileOutputData("false")  into tAttachment[tAttachmentCount]["data"] --the csv doc is never in HTML format
+            
+            put "text/csv" into tAttachment[tAttachmentCount]["type"] 
+            put "This Feeling data.csv" into tAttachment[tAttachmentCount]["name"] 
+            
+            if tAnnotateOutput is true then
+               mobileComposeHTMLMail tSubject, tTo, tCCs, tBCCs, tBody, tAttachment
+            else
+               mobileComposeMail tSubject, tTo, tCCs, tBCCs, tBody, tAttachment
+            end if
+            break
+            
+            --
+            --these options only save the *current* view (not all the ones you've done).
+            --
+         case cSaveToPhotoLibrary
+         case cSaveToPhotoLibraryAnnotated
+            if tAnnotateOutput is true then
+               put the rect of grc "DrawLimit" of cd "Somatic" into tSourceRect
+               put 0 into item 2 of tSourceRect -- i.e. we want the screenshot to include the annotated field areas above the drawlimit
+               
+               show field "InViewAnnotation1"
+               show field "InViewAnnotation2"
+               
+               put GeneratePainSpotData(gCurrentView) into tTemptText --no HTML for the photo library
+               replace "," with tab in tTemptText
+               put tTemptText into fld "InViewAnnotation1"
+               
+               put GenerateDrawingData(gCurrentView) into tTemptText
+               replace "," with tab in tTemptText
+               put tTemptText into fld "InViewAnnotation2"
+               
+            else
+               put the rect of grc "DrawLimit" of cd "Somatic" into tSourceRect 
+            end if
+            
+            set lockscreen to true
+            set the paintcompression to "PNG"
+            import snapshot from rectangle tSourceRect
+            
+            --PlayCameraShutterSound
+            
+            put the long  id of the last image into lLongImgID --record the long ID so we can save this image to the image library
+            put the id of the last image into lImgID --record the short ID so we can delete this screenshot image from the stack so we can continue to work
+            MobileExportImageToAlbum lLongImgID
+            if the result is not empty then
+               --put the result into fld "debug"
+               answer error ("Saving screenshot failed: " & the result) with OK
+            end if
+            delete image id lImgID
+            
+            hide field "InViewAnnotation1" --hide them (just in case we showed them for annotation purposes)
+            hide field "InViewAnnotation2"
+            
+            set lockscreen to false
+            break
+      end switch
+      if tAnnotateOutput is true then
+         DeleteAllAnnotations
+      end if
+   end if
+end touchEnd
+
+
+function CompileOutputData pAsHTML
+   if pAsHTML is true then
+      put "<br/>" into tExtraTag
+   else
+      put empty into tExtraTag
+   end if
+   put GenerateCAPSHeader(pAsHTML) into theOutput
+   put GenerateEmotionsData(pAsHTML) after theOutput 
+   put GeneratePageHeaderData(pAsHTML) after theOutput
+   
+   --retrieve the list of all active views for this page
+   put the keys of gMostRecentScreenShotArr[gCurrentPage] into tScreenshotList
+   --this might include two items for FrontAndBack so we need to remove one of them.
+   if tScreenshotList contains "FrontAndBack" then
+      filter tScreenshotList without "FrontAndBack*" --remove all the one-up ones (there may be only one of them)
+      put "FrontAndBack" & return before tScreenshotList --and add a non one-up version to the list
+   end if
+   
+   repeat for each line aView in tScreenshotList --get the view name of each screenshot
+      put tExtraTag & "View:" && aView & tExtraTag & return after theOutput
+      put "Pain Spots" & tExtraTag & return after theOutput
+      put GeneratePainSpotData(aView,pAsHTML) after theOutput  
+      put tExtraTag & tExtraTag & "Drawings" & tExtraTag & return after theOutput
+      put GenerateDrawingData(aView,pAsHTML) & tExtraTag after theOutput
+   end repeat
+   
+   return theOutput
+end CompileOutputData
+
+
+
+on TouchRelease
+      set the blendLevel of me to 0
+end TouchRelease

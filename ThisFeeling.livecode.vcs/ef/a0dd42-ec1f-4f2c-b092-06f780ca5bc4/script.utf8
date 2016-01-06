@@ -1,0 +1,22 @@
+on touchEnd
+   set the blendLevel of me to 0
+   DisplayStorageUseStats
+   show group "actions"
+end touchEnd
+   
+
+on Touchstart
+   set the blendLevel of me to 70
+end Touchstart
+
+
+
+on mouseLeave
+   set the blendLevel of me to 0
+end mouseLeave
+   
+   
+   
+on mouseUp
+   send "touchEnd" to me
+end mouseUp

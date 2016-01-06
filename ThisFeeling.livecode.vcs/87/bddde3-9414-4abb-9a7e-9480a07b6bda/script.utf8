@@ -1,0 +1,3 @@
+on touchEnd
+   SPrefsTouch 3
+end touchEnd

@@ -1,0 +1,4 @@
+on touchStart pID
+   TextTouch (the short name of me),pID
+end touchStart
+

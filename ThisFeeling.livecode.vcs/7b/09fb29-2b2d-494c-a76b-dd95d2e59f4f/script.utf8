@@ -1,0 +1,44 @@
+constant cViewList = "FrontAndBack,hands,feet,head_back,head_front"
+global gCurrentView
+
+on touchend
+   local theMLoc
+   put mouseloc() into theMLoc
+   repeat for each item theImage in cViewList
+      if theMLoc is within the rect of img theImage then
+         if theImage is not gCurrentView then --i.e. do nothing if they tap the same zoom view image again.
+            --position the highlight in the palette
+            --            set the width of grc "ZoomViewHighlight" to (the width of img theImage + 6)
+            --            set the height of grc "ZoomViewHighlight" to (the height of img theImage + 6)
+            --            set the loc of grc "ZoomViewHighlight" to the loc of img theImage
+            
+            DrawZoomViewHighlightRect theImage
+            
+            ChangeView theImage  --this will update the value for gCurrentView and cpViewImage
+            --put theImage into gCurrentView
+            
+            --setup the zoomImage appropriately (though don't show it yet)
+            --            if theImage is "FrontAndBack" then --if it's front and back we need to show those rather than a Zoomed view
+            --               set the filename of img "ZoomImage" to ""
+            --               HideOrShowEmotionsPalette "show"
+            --               DrawBodyViews
+            --            else
+            --               set the filename of img "ZoomImage" to "./graphics/ZoomedViews/" & theImage & " view.png"
+            --               HideOrShowEmotionsPalette "hide"
+            --               DrawBodyViews "Zoomed"
+            --            end if
+            
+            DrawView theImage
+            
+         end if
+         exit repeat
+      end if
+   end repeat
+end touchend
+
+
+on mouseup
+   if not mob() then
+      send touchEnd to me
+   end if
+end mouseup

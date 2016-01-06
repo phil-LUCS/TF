@@ -1,0 +1,7 @@
+on touchEnd
+   HidePreferences
+end touchEnd
+    
+on mouseUp
+    send touchEnd to me
+end mouseUp

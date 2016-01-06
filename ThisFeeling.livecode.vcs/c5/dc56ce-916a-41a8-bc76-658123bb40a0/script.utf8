@@ -1,0 +1,11 @@
+on Touchstart tID
+   TextTouch  the short name of me ,tID
+end Touchstart
+
+
+on returnInField
+   --so we can't do multi-line
+   set the lockText of me to true
+   focus on nothing
+end returnInField
+   

@@ -1,0 +1,7 @@
+on touchend
+   show grc "groove2" of grp "ClearAllStoredSessionData" of cd "StartAndSetup"
+   DeleteAllSessionData
+   ClearAllInMemoryDataAndSetupNewSession false
+   DisplayStorageUseStats
+   hide grc "groove2" of grp "ClearAllStoredSessionData" of cd "StartAndSetup"
+end touchend

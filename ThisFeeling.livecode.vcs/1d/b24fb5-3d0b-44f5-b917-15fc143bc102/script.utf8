@@ -1,0 +1,3 @@
+on touchEnd
+   send touchEnd to fld "website" --so we are effectively clicking the web link
+end touchEnd

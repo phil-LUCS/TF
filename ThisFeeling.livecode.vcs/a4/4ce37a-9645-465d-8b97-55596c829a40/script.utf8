@@ -1,0 +1,7 @@
+on TouchStart
+   SetDrawingColour (the short name of me)
+end TouchStart
+
+on TouchEnd
+   --do nothing
+end TouchEnd

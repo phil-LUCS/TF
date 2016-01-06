@@ -1,0 +1,13 @@
+on touchend
+   global gCAPS_ID
+   show grc "groove2" of grp "NewSomaticExperiencesBtn" of cd "StartAndSetup"
+   wait for 6 ticks with messages
+   ClearAllInMemoryDataAndSetupNewSession true
+   mobileSetKeyboardType "numeric"
+   ask "Please enter a label for the new session:"
+   put it into gCAPS_ID
+   put gCAPS_ID into fld "CAPS_ID"
+   mobileSetKeyboardType "default"
+   wait for 2 ticks with messages
+   hide grc "groove2" of grp "NewSomaticExperiencesBtn" of cd "StartAndSetup"
+end touchend

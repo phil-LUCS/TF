@@ -1,0 +1,18 @@
+{
+  "build path": "",
+  "name": "TF",
+  "plugins": [
+    "cRevGeneral",
+    "cREVGeometry",
+    "cREVGeometryCache",
+    "cRevStandaloneSettings",
+    "dataviewProps",
+    "dgProps",
+    "GLX2",
+    "uSelectedChunk"
+  ],
+  "resource paths": "",
+  "stackFiles": [
+    "ThisFeeling.livecode"
+  ]
+}

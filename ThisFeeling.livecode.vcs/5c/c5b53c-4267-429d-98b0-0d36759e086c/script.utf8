@@ -1,0 +1,5 @@
+on preOpenCard
+   set the height of grc "Backdrop" of cd "Configure" to the height of this stack 
+   set the width of grc "Backdrop" of cd "Configure" to the width of this stack 
+   set the topLeft of grc "Backdrop" of cd "Configure" to 0,0
+end preOpenCard

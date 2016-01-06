@@ -1,0 +1,64 @@
+global gGender
+
+on TapMe
+   local tSlotWidth,tOffset, tWhichSlot
+   put the clickloc into lClickLoc --h,v
+   put item 1 of lClickLoc - the left of group "GenderChooser" into tOffset
+   put round (the width of group "GenderChooser"  / 4) into tSlotWidth
+   put (tOffset div tSlotWidth) + 1 into tWhichSlot
+   put ChooseGenderAndAge( tWhichSlot) into gGender
+   
+   --gGender can now be "none", "male", "female", "boy" or "girl"
+   SetupPersonImages
+   ResetSomaticCard --clear it - if there was a session in progress remove it (the change of person would affect any placed items anyway)
+end TapMe
+
+
+command ResetTheGenderChooser
+   put ChooseGenderAndAge(1) into gGender --default is the "man"
+   SetupPersonImages
+end ResetTheGenderChooser
+
+
+function ChooseGenderAndAge pSelectedIndex
+   constant cSelectedFolder = "chosen"
+   constant cUnSelectedFolder = "not_chosen"
+   
+   local tImageList, tGenderAndAgeChoice,tSelectedImage,tNewHV
+   put "none" into tGenderAndAgeChoice
+   put "male,female,boy,girl" into tImageList
+   set lockscreen to true
+   repeat for each item theImage in tImageList
+      set the filename of image theImage to "./graphics/" & cUnSelectedFolder &"/" & theImage & ".png"
+      set the loc of image theImage to the loc of btn theImage
+      ClearDropShadow  (the long id of image theImage)
+   end repeat
+   put item pSelectedIndex of tImageList into tSelectedImage
+   if there is an image tSelectedImage then
+      set the filename of image tSelectedImage to "./graphics/" & cSelectedFolder &"/" & tSelectedImage & ".png"
+      put the loc of btn tSelectedImage into tNewHV
+      subtract 6 from item 1 of tNewHV
+      subtract 6 from item 2 of tNewHV
+      set the loc of image tSelectedImage to tNewHV
+      SetDropShadow  (the long id of image tSelectedImage)
+      put tSelectedImage into tGenderAndAgeChoice
+   end if
+   set lockscreen to false
+   return tGenderAndAgeChoice
+end ChooseGenderAndAge
+
+on mouseup
+   if not mob() then
+      TapMe
+   end if
+end mouseup
+
+on TouchEnd
+   TapMe
+end TouchEnd
+
+on TouchStart
+end TouchStart
+
+on MouseDown
+end MouseDown

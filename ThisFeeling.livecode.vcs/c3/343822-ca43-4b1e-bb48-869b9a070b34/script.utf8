@@ -1,0 +1,19 @@
+global gTempTouchToEditText, gTouchToEditText
+global gPrefs
+
+on touchstart
+    show grc "PrefsOKhighlight" 
+end touchstart
+
+--if we touch "OK" then update the current working versions of the controls
+--and also the more permanent ones (that we save for future use).
+
+on touchEnd
+   hide grc "PrefsOKhighlight" 
+   put gTempTouchToEditText into gTouchToEditText
+     
+   --   SaveStoredPrefs --save those prefs for future use
+   hide grp "preferences"
+end touchEnd
+    
+

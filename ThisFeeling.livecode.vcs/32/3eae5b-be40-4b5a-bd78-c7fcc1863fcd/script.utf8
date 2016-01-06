@@ -1,0 +1,5 @@
+on touchend
+   --if the PhilStatus of me is  "enabled" then
+      DoPageFlip -1
+   --end if
+end touchend

@@ -1,0 +1,7 @@
+on touchstart
+    send touchstart to grc "PrefsOK"
+end touchstart
+    
+on touchEnd
+    send touchEnd  to grc "PrefsOK"
+end touchEnd

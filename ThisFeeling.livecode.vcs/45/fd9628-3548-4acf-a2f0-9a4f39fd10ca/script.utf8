@@ -1,0 +1,3 @@
+on touchEnd
+   send touchEnd to fld "option7"
+end touchEnd

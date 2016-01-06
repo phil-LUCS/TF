@@ -1,0 +1,29 @@
+on mouseUp
+   local tTemptText
+   if the visible of fld "InViewAnnotation1" is false then
+      show field "InViewAnnotation1"
+      show field "InViewAnnotation2"
+      SaveCurrentPagePainSpotInfo
+      SaveCurrentPageDrawingInfo
+      
+      AnnotateAllItems
+      
+      put GeneratePainSpotData() into tTemptText
+      replace "," with tab in tTemptText
+      put tTemptText into fld "InViewAnnotation1"
+      
+      put GenerateDrawingData() into tTemptText
+      replace "," with tab in tTemptText
+      put tTemptText into fld "InViewAnnotation2"
+      
+      --      put GeneratePainSpotData(true) into fld "Report"
+      --      put GenerateDrawingData(true) into fld "Report"
+      
+      show fld "Report"
+   else
+      hide field "InViewAnnotation1"
+      hide field "InViewAnnotation2"
+      
+      hide fld "Report"
+   end if
+end mouseUp

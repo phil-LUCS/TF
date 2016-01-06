@@ -1,0 +1,64 @@
+constant cNumEmotions = 9
+constant cEmotScaleFactorItem = 10
+
+
+global gCurrentEmotion
+global gTextTouchInProgress
+global gToMove
+global gGender
+
+on preOpenCard
+   --SetupPersonImages
+   DrawEmotionPalette
+   DrawPerson
+end preOpenCard
+   
+   
+on touchstart
+   --CloseUpFaceAndLabel
+end touchstart
+
+on touchMove pId, pX, pY
+   if gToMove is not empty then
+      -- PJdebug  "move:" &&  gToMove --the target
+      
+      set the loc of image gToMove to pX, pY
+   end if
+end touchMove
+   
+
+on touchEnd
+   local lFileName, tLocOffset, tImgLoc, tEmotScaleFactor
+   if gTextTouchInProgress is not empty then
+      unHighLightTextField item 1 of gTextTouchInProgress
+      put empty into gTextTouchInProgress --do it now because we might be in the middle of something later
+   end if
+   if gCurrentEmotion is not empty then
+      hide image "Emotion"
+      set the lockloc of image "Emotion" to false
+      put "./graphics/emotion faces/large emotions/emotion" && gCurrentEmotion & ".png" into lFileName
+      set the filename of image "Emotion" to lFileName
+      put line gCurrentEmotion of the cpEmotLocOffsets of image "person" of cd "emotions" into tLocOffset
+      put line cEmotScaleFactorItem of the cpEmotLocOffsets of image "person" of cd "emotions" into tEmotScaleFactor
+      set the lockloc of image "Emotion" to true
+      set the width of image "Emotion" to round((the width of img "Emotion") * tEmotScaleFactor)
+      set the height of image "Emotion" to round((the height of img "Emotion") * tEmotScaleFactor)
+      put the loc of image "person" into tImgLoc
+      set the loc of image "Emotion" to (item 1 of tLocOffset + item 1 of tImgLoc),(item 2 of tLocOffset + item 2 of tImgLoc)
+      move image "DragFace" to the loc of image "Emotion" in 10 ticks
+      
+      hide image "DragFace"
+      show image "Emotion"
+      put empty into gCurrentEmotion
+   end if
+   put empty into gToMove
+end touchEnd
+   
+on closecard
+   global gOpenFace
+   put empty into gOpenFace --if we return we will have no "open" face.
+   repeat with looper=1 to cNumEmotions
+      put empty into fld ("label" & looper)
+   end repeat
+   hide image "Emotion"
+end closecard

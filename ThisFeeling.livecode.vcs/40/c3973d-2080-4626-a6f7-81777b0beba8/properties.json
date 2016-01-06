@@ -1,0 +1,46 @@
+{
+  "UUID": "40c3973d-2080-4626-a6f7-81777b0beba8",
+  "class": "com.runrev.engine.card",
+  "customPropertySets": {
+    "cREVGeneral": {
+      "revUniqueID": "1326656039681"
+    },
+    "tRevGeneral": {
+      "tRevUniqueID": "1326656040683"
+    }
+  },
+  "properties": {
+    "altId": "0",
+    "backColor": "231,231,231",
+    "backPattern": "",
+    "behavior": "",
+    "blendLevel": "0",
+    "borderColor": "",
+    "borderPattern": "",
+    "borderWidth": "2",
+    "bottomColor": "",
+    "bottomPattern": "",
+    "cantDelete": "true",
+    "dontSearch": "false",
+    "focusColor": "",
+    "focusPattern": "",
+    "foreColor": "",
+    "forePattern": "",
+    "hiliteColor": "",
+    "hilitePattern": "",
+    "id": "1002",
+    "ink": "srcCopy",
+    "mark": "false",
+    "name": "Emotions",
+    "shadowColor": "",
+    "shadowOffset": "4",
+    "shadowPattern": "",
+    "showBorder": "false",
+    "textFont": "",
+    "textSize": "",
+    "textStyle": "",
+    "threeD": "true",
+    "topColor": "",
+    "topPattern": ""
+  }
+}

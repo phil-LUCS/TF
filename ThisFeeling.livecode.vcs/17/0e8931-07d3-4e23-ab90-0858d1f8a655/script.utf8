@@ -1,0 +1,21 @@
+global gToolPaletteStatus
+
+on TouchStart
+   ToolsTouchStart --the handler for this is on the card
+end TouchStart
+
+on TouchMove
+   if gToolPaletteStatus is "painspots" then
+      pass TouchMove
+   else
+      ToolsTouchMove
+   end if
+end TouchMove
+
+on TouchEnd
+   if gToolPaletteStatus is "painspots" then
+      pass TouchEnd
+   else
+      ToolsTouchEnd
+   end if
+end TouchEnd

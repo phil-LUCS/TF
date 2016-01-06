@@ -1,0 +1,6 @@
+on touchend
+    show grc "groove2" of grp "EmotionsBtn" of cd "StartAndSetup"
+    visual effect "push left"
+    go cd "Emotions"
+    hide grc "groove2" of grp "EmotionsBtn" of cd "StartAndSetup"
+end touchend

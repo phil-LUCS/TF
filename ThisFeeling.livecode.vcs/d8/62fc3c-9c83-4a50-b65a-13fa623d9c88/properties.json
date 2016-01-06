@@ -1,0 +1,46 @@
+{
+  "UUID": "d862fc3c-9c83-4a50-b65a-13fa623d9c88",
+  "class": "com.runrev.engine.card",
+  "customPropertySets": {
+    "cREVGeneral": {
+      "revUniqueID": "1326639448578"
+    },
+    "tRevGeneral": {
+      "tRevUniqueID": "1326639449593"
+    }
+  },
+  "properties": {
+    "altId": "0",
+    "backColor": "255,255,255",
+    "backPattern": "",
+    "behavior": "",
+    "blendLevel": "0",
+    "borderColor": "",
+    "borderPattern": "",
+    "borderWidth": "2",
+    "bottomColor": "",
+    "bottomPattern": "",
+    "cantDelete": "true",
+    "dontSearch": "false",
+    "focusColor": "",
+    "focusPattern": "",
+    "foreColor": "",
+    "forePattern": "",
+    "hiliteColor": "",
+    "hilitePattern": "",
+    "id": "1015",
+    "ink": "srcCopy",
+    "mark": "false",
+    "name": "Somatic",
+    "shadowColor": "",
+    "shadowOffset": "4",
+    "shadowPattern": "",
+    "showBorder": "false",
+    "textFont": "",
+    "textSize": "",
+    "textStyle": "",
+    "threeD": "true",
+    "topColor": "",
+    "topPattern": ""
+  }
+}

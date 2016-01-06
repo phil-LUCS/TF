@@ -1,0 +1,9 @@
+on touchEnd
+   put empty into me
+   pass touchEnd
+end touchEnd
+
+
+on mouseup
+   put empty into me
+end mouseup

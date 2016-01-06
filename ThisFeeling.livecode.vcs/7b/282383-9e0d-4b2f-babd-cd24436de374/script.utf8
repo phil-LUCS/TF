@@ -1,0 +1,49 @@
+command HideActions
+    hide grp "Actions" of cd "StartAndSetup"
+end HideActions
+
+   
+command HidePreferences
+   hide grp "Preferences" of cd "StartAndSetup"
+end HidePreferences
+
+
+on LCVCSExport
+   send ResetTheGenderChooser to grp "GenderChooser" of cd "StartAndSetup"
+   put "----" into fld "CAPS_ID" of this cd
+end LCVCSExport
+
+
+
+on touchend
+   if the mouseloc is within the rect of grc "prefsbtnrect" then
+      send TouchEnd to image "preferences" 
+   else
+      HidePreferences
+      if  the mouseloc is within the rect of grc "actionsbtnrect" then
+         send TouchEnd to grp  "gear" 
+      else
+         if the mouseloc is within the rect of grc "ToggleNetworkCheckBtns" then
+            set the visible of grp "network test buttons" to not (the visible of grp "network test buttons")
+         end if
+         HideActions
+      end if
+   end if
+end touchend
+
+on preopencard
+   if the environment is "development" then
+      show fld "CopyrightInfo" of cd "StartAndSetup"
+      show grp "network test buttons" of cd "StartAndSetup"
+   else
+      hide fld "CopyrightInfo" of cd "StartAndSetup"
+      hide grp "network test buttons" of cd "StartAndSetup"
+   end if
+end preopencard
+
+
+on touchstart
+   if the mouseloc is within the rect of grc "actionsbtnrect" then
+      send Touchstart to grp "gear" 
+   end if
+end touchstart

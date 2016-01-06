@@ -1,0 +1,3 @@
+on touchStart
+   faceclick 5
+end touchStart

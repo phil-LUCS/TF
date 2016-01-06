@@ -1,0 +1,14 @@
+on returnInField
+   --so we can't do multi-line
+   set the lockText of me to true
+   focus on nothing
+end returnInField
+   
+on touchStart tID
+   if the text of me is (the cpPromptText of me) then
+      put empty into me
+      set the textcolor of me to 0,0,0
+   end if
+   TextTouch (the short name of me), tID
+   --pass TouchStart
+end touchStart

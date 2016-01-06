@@ -1,0 +1,1929 @@
+constant cViewList = "FrontAndBack,hands,feet,head_back,head_front"
+constant cNoPainID = 1609
+
+constant cEmotScaleFactorItem = 10
+
+constant cFullOn = 15
+
+
+global gToMove
+global gCurrentEmotion
+global gCurrentView
+global gShowWhichSingleBodyView
+global gCurrentPainSpot
+global gCPSOriginalLoc --when we move a pain spot, where did it start out?
+global gAnimations --multidimensional array which holds all the frame info for animated pain spots
+--[a][b][c]  -- a = type, b = size and c= frame of animation - the value held for this element is the ID of an image
+
+global gAnimationExceptionsArr --any pain types which do not have animated representations are recorded here.
+global gAnimInit
+global gTextTouchInProgress
+global gInitialTextTouchLoc
+global gAnimatedBtns --a list of btn names of buttons being animated - the data for each element is the type of the btn
+global gAnimationTickCount --the current tick interval count for all animated buttons
+global gCurrentFrame -- holds the current animation frame number on show for this particular pain spot.
+
+
+global gTextEditTarget
+global gKeyboardOnShow
+global gBackdropTouchDown
+global gToolPaletteStatus
+
+global gPageCount
+global gCurrentPage
+
+global gSessionFolder --where should we save stuff?
+
+global gLastValidCoord --where was the last valid coord we passed during our drag about.
+
+global gPainSpotPageArr
+global gDrawingPageArr
+global gScaledDrawingPageArr
+global gScaledPSPageArr
+global gPageEmotionArr --a record of the value of gCurrentEmotion for each page
+global gPageDescArr --the description for each page (which will default to "Page x of y" if there is no description)
+global gPageDirtyFlagArr --a flag for each page that has had something change since the last screenshot was taken
+global gViewWidthsArr --the widths of the various large view images (including the two-bodies view).
+
+
+global gShowZoomPalette
+global gShowTwoViews
+global gUseVandPImages
+global gEnableGremlinMode
+global gShowFireObject
+global gShowNoPainObject
+global gEnableColourSwatches
+global gShowLRGuidance
+
+global gPrefs
+
+
+constant cDefaultThrobRate = 3
+constant cDefaultSize = 3
+constant cInitialFrame = 1
+
+constant cEmotZoomSpeed = 20
+
+
+constant cNumColourSwatches=12
+constant cNumPenThicknessSettings=4
+
+
+--
+--the Calculation applied is:
+-- round(((cTickStartValue - (3*((the cpThrobRate of this button)-1))) * cTickMultiplier) - 1)
+--
+--for values between 1 and 5 this comes in at:
+-- 34
+-- 27
+-- 19
+-- 12
+-- 4
+-- These are multiples of the cAnimationTick.
+--
+constant cTickMultiplier = 2.6 --was 2.5
+constant cTickStartValue = 13 --was 14
+
+constant cAnimationTick = 19 --was 25 milliseconds.
+
+
+local allowDraw
+
+--
+--
+--
+--
+
+on initAnimations
+   if gAnimInit is empty then
+      put true into gAnimInit
+      put fld "animationInfo" of cd "AnimationStore" into lTmp
+      set the itemDelimiter to tab
+      repeat for each line theline in lTmp
+         put item 1 of theline into lType
+         if char 1 of lType is "*" then
+            delete char 1 of lType --remove it
+            put "true" into gAnimationExceptionsArr[lType] --this does not animate.
+         end if
+         put item 2 of theline into lSize
+         put item 3 to -1 of theline into lFrames --the remainder of the data line
+         --put the number of items of lFrames into lFrameCount
+         put 1 into lFCounter
+         repeat for each item lTheFrame in lFrames
+            put lTheFrame into gAnimations[lType][lSize][lFCounter]
+            add 1 to lFCounter
+         end repeat
+         put 0 into gAnimations[lType][lSize][lFCounter] --the final element for any animation is a 0 element
+      end repeat
+   end if
+end initAnimations
+
+
+--init the pain spot preferences panel which displays all sizes and speeds for this type
+on InitPSPrefsAnimations pType
+   put "size1,size2,size3,size4,size5,throb1,throb2,throb3,throb4,throb5" into lBtnList
+   repeat for each item theBtn in lBtnList
+      if gAnimationExceptionsArr[pType] is true and theBtn contains "throb" then
+         hide btn theBtn of cd "Somatic" 
+      else
+         show btn theBtn of cd "Somatic" 
+         put the cpSize of btn theBtn of cd "Somatic" into lSize
+         put gAnimations[pType][lSize][cInitialFrame] into lBtnImage
+         set the icon of btn theBtn of cd "Somatic" to lBtnImage --init them to their starting state
+         put pType into gAnimatedBtns[theBtn]
+         set the cpPSType of btn theBtn of cd "Somatic" to pType
+         put cInitialFrame into gCurrentFrame[theBtn]  --set the frame to the first frame.
+         SetupAnimationTickCount theBtn
+      end if
+   end repeat
+   if gAnimationExceptionsArr[pType] is true  then
+   else
+   end if
+end InitPSPrefsAnimations
+
+
+command AnimateBtn pWhichBtn
+   put cInitialFrame into gCurrentFrame[pWhichBtn]
+   SetupAnimationTickCount pWhichBtn
+   put the cpPSType of btn pWhichBtn into gAnimatedBtns[pWhichBtn] --set it up as an animated button
+end AnimateBtn
+
+
+command SetupAnimationTickCount pWhichBtn
+   -- put ((cTickStartValue - (3*((the cpThrobRate of btn pWhichBtn of cd "Somatic")-1))) * cTickMultiplier) into gAnimationTickCount[pWhichBtn]
+   
+   put round(((cTickStartValue - (3*((the cpThrobRate of btn pWhichBtn of cd "Somatic")-1))) * cTickMultiplier) - 1) into gAnimationTickCount[pWhichBtn]
+   
+end SetupAnimationTickCount
+
+
+command StartAnimation
+   send CheckAnimation to me in cAnimationTick milliseconds --was 25 milliseconds
+end StartAnimation
+
+
+command StopAnimation
+   cancelThisMsg CheckAnimation
+end StopAnimation
+
+
+
+command CheckAnimation
+   set lockMessages to true
+   send CheckAnimation to me in cAnimationTick milliseconds
+   repeat for each line theBtn in (the keys of gAnimatedBtns) --check all btns
+      if the effective visible of btn theBtn is true then --don't animate invisible buttons, including those that are invisible because their group is invisible
+         if the cpThrobRate of btn theBtn of cd "Somatic" > 1 then --i.e. ignore any buttons that have a throb rate of 1 - aka static
+            subtract 1 from gAnimationTickCount[theBtn] --count down
+            if gAnimationTickCount[theBtn]  < 0 then
+               --we're ready for the next frame of the animation
+               put gCurrentFrame[theBtn] into lFrame
+               put the cpSize of btn theBtn of cd "Somatic" into lSize
+               add 1 to lFrame --we need to get the btn for the next frame
+               put gAnimations[gAnimatedBtns[theBtn]][lSize][lFrame] into lNextID --get the ID of the next image to use
+               if lNextID is 0 then --if its 0 we need to go back to the initial frame
+                  put gAnimations[gAnimatedBtns[theBtn]][lSize][cInitialFrame] into lNextID --get the ID of the initial frame image
+                  put cInitialFrame into gCurrentFrame[theBtn]
+               else
+                  put lFrame into gCurrentFrame[theBtn]
+               end if
+               set the icon of btn theBtn of cd "Somatic" to lNextID
+               SetupAnimationTickCount theBtn --set up the button timer ready for the next frame of the animation
+            end if
+         end if
+      end if
+   end repeat
+   set lockMessages to false
+end CheckAnimation
+
+
+
+on keyboardActivated
+   put true into gKeyboardOnShow
+   if the visible of grp "PSproperties" is true then
+      PlacePSProperties
+   end if
+end keyboardActivated
+
+
+on keyboardDeactivated
+   put false into gKeyboardOnShow
+   if gTextEditTarget is "PSLabel" then
+      if  the CurrentPainSpot of grp "PSProperties"  is not empty then
+         set the cpPSLabel of btn (the CurrentPainSpot of grp "PSProperties" ) to fld "PSLabel" of grp "PSproperties"
+         send SetupPSLabel to grp "PSProperties"
+         --PJDebug gCurrentPainSpot
+         
+         PlacePSProperties --move the properties palette back to where it usually is (if it moved when the keyboard appeared)
+      end if
+   end if
+   pass keyboardDeactivated
+end keyboardDeactivated
+
+
+
+on preOpenCard
+   if mob() then
+      resizeStack
+      initAnimations
+   end if
+end preOpenCard
+
+
+on openCard
+   put empty into gBackdropTouchDown
+   if gToolPaletteStatus is empty then --set a default if we don't currently have one
+      SetToolsPaletteStatus "painspots"
+   end if
+   if mob() then
+      StartAnimation
+      set the label of btn "Animate" to "Stop"
+      UpdateDescriptionContents
+   end if
+   PlaceLRGuidance -- to catch the one-up view with L&R guidance case.
+   DrawNavigationControls
+   if gCurrentView is "FrontAndBack" then
+      HideOrShowEmotionsPalette "show"
+   end if
+end openCard
+
+
+on closeCard
+   if mob() then
+      StopAnimation
+   end if
+end closeCard
+
+
+Command HideAllToolPaletteGoodies
+   local lToolTypes
+   set lockscreen to true
+   put "cloud,ellipse,spikes,flash,itchy,query,slash,fire" into lToolTypes 
+   repeat for each item thePainSpot in lToolTypes
+      hide image thePainSpot of grp "Toolset"
+   end repeat
+   
+   repeat with looper=1 to cNumColourSwatches
+      hide grc ("Colour" & looper) of grp "Toolset"
+   end repeat
+   repeat with looper=1 to cNumPenThicknessSettings
+      hide grc ("line" & looper) of grp "Toolset"
+   end repeat
+   
+   hide grc "tab1block"
+   hide grc "tab2block"
+   show grc "tab3block"
+   hide grc "colourSwatchHighlight"
+   hide grc "PenThicknessHighlight"
+   hide grc "sep"
+   hide grp "ColourBlock"
+   set lockscreen to false
+end HideAllToolPaletteGoodies
+
+
+command ShrinkOrGrowToolPalette pStatus
+   constant cStepSize = 10
+   local tDestRect, tSrcRect, tRDiffArr, tNumSteps, tSrcCoordsArr, tDelta
+   switch pStatus
+      case "drawing"
+         if gEnableColourSwatches is false then
+            put the rect of grc "DrawingModeColourStripRect" into tDestRect
+         else
+            put the rect of grc "DrawingModeRect" into tDestRect
+         end if
+         break
+      case "painspots"
+         put the rect of grc "PainSpotsModeRect" into tDestRect
+         break
+      case "moving"
+         put the rect of grc "MovingModeRect" into tDestRect
+         break
+   end switch
+   put the rect of grc "ToolPaletteFrame" into tSrcRect
+   
+   --ltrb
+   put 0 into tLargestDelta
+   put 0 into tLargestDimension
+   repeat with looper=1 to 4
+      put item looper of tSrcRect into tSrcCoordsArr[looper]
+      put item looper of tDestRect - item looper of tSrcRect into tDelta
+      put tDelta into tRDiffArr[looper]
+      if abs(tDelta) > abs(tLargestDelta) then
+         put tDelta into tLargestDelta
+         put looper into tLargestDimension
+      end if
+   end repeat
+   put (abs(tLargestDelta) div cStepSize) into tNumSteps
+   if tNumSteps > 0 then
+      repeat with looper=1 to 4
+         put tRDiffArr[looper] div tNumSteps into tRStepSizeArr[looper]
+      end repeat
+   end if
+   
+   
+   repeat with looper=1 to tNumSteps
+      set the rect of grc "ToolPaletteFrame" to tSrcCoordsArr[1]+( tRStepSizeArr[1] * looper), tSrcCoordsArr[2]+( tRStepSizeArr[2] * looper),\
+      tSrcCoordsArr[3]+( tRStepSizeArr[3] * looper),tSrcCoordsArr[4]+( tRStepSizeArr[4] * looper)
+      wait for 10 milliseconds with messages
+   end repeat
+   set the rect of grc "ToolPaletteFrame" to tDestRect
+   
+end ShrinkOrGrowToolPalette
+
+
+
+on SetToolsPaletteStatus pStatus, pForceIt
+   --pStatus can have three values
+   --"painspots" - which is when all the pain types are on display (the default, set on opencard)
+   -- "drawing" - which hides all the pain types and shows the drawing tools
+   -- "moving" - which hides all the usual content but makes the drawings and pain spots movable.
+   --furthermore, if the gEnableColourSwatches is true, we get to see 12 discrete colour blocks and a highlight to choose our colour,
+   --otherwise, we see two blocks and we pick a colour by touchend-ing on a bit of the block.
+   
+   if (gToolPaletteStatus is pStatus) and (pForceIt is not true) then --if we're already at this state, then just exit
+      exit SetToolsPaletteStatus
+   end if
+   
+   put "cloud,ellipse,spikes,flash,itchy,query,slash" into lToolTypes 
+   
+   if gShowFireObject is true then
+      put ",fire" after lToolTypes 
+   end if
+   
+   if gShowNoPainObject is true then
+      put ",nopain" after lToolTypes
+   end if
+   
+   HideAllToolPaletteGoodies
+   
+   ShrinkOrGrowToolPalette pStatus
+   
+   set lockscreen to true
+   
+   repeat for each item thePainSpot in lToolTypes
+      if pStatus is "painspots" then --only show the painspots if we are in painspot mode
+         show image thePainSpot of grp "Toolset"
+      else
+         hide image thePainSpot of grp "Toolset"
+      end if
+   end repeat
+   repeat with looper=1 to cNumColourSwatches
+      if (pStatus is among the items of "painspots,moving") or (gEnableColourSwatches is false) then --if we've got the painspots on show, or we are not using the swatches.
+         hide grc ("Colour" & looper) of grp "Toolset"
+      else
+         show grc ("Colour" & looper) of grp "Toolset"
+      end if
+   end repeat
+   repeat with looper=1 to cNumPenThicknessSettings
+      if pStatus is among the items of "painspots,moving" then
+         hide grc ("line" & looper) of grp "Toolset"
+      else
+         show grc ("line" & looper) of grp "Toolset"
+      end if
+   end repeat
+   
+   
+   if pStatus is "painspots" then
+      show grc "tab1block"
+      hide grc "tab2block"
+      hide grc "tab3block"
+      hide grc "colourSwatchHighlight"
+      hide grc "PenThicknessHighlight"
+      hide grc "sep"
+      hide grp "ColourBlock"
+   else
+      if pStatus is "drawing" then
+         hide grc "tab1block"
+         show grc "tab2block"
+         hide grc "tab3block"
+         show grc "PenThicknessHighlight"
+         show grc "sep"
+         if gEnableColourSwatches is true then
+            hide grp "ColourBlock"
+            show grc "colourSwatchHighlight"
+         else
+            show grp "ColourBlock"
+            hide grc "colourSwatchHighlight"
+         end if
+      else
+         if pStatus is "moving" then
+            hide grc "tab1block"
+            hide grc "tab2block"
+            show grc "tab3block"
+            hide grc "colourSwatchHighlight"
+            hide grc "PenThicknessHighlight"
+            hide grc "sep"
+            hide grp "ColourBlock"
+         end if
+      end if
+   end if
+   set lockscreen to false
+   put pStatus into gToolPaletteStatus
+end SetToolsPaletteStatus
+
+
+on TouchStart pTouchID
+   local tMLoc
+   put the mouseloc into tMLoc
+   hide group "SomaticPrefs"
+   if tMLoc is within the rect of grp "gear" then
+      send TouchStart to grp "gear"
+      exit TouchStart
+   end if
+   put empty into gToMove
+   put empty into gBackdropTouchDown
+   put empty into lObjectFound
+   
+   
+   if (gToolPaletteStatus is "moving") or (gToolPaletteStatus is "painspots") then
+      --if gToolPaletteStatus is "painspots" then
+      repeat with looper = 1 to (the number of buttons of this cd)
+         if (the visible of btn looper is true) and (tMLoc is within the rect of btn looper) then --i.e. we could touchstart on an invisible button otherwise
+            if the cType of btn looper is "draggable" then
+               put the short name of btn looper into gToMove
+               hide grc "PSHighlight" --hide it temporarily
+               hide grp "PSProperties"
+               hide grc "Pointer"
+               hide image "gremlin"
+               put gToMove into gCurrentPainSpot
+               put the loc of btn gCurrentPainSpot into lBtnLoc
+               put the loc of btn gCurrentPainSpot into gCPSOriginalLoc
+               put item 1 of tMLoc into lMouseH
+               put item 2 of tMLoc into lMouseV
+               put lMouseH - (item 1 of lBtnLoc) into lHOffset
+               put lMouseV - (item 2 of lBtnLoc) into lVOffset
+               set the cpHOffset of btn gCurrentPainSpot to lHOffset
+               set the cpVOffset of btn gCurrentPainSpot to lVOffset
+               put true into lObjectFound
+               exit repeat
+            end if
+         end if
+      end repeat
+   end if
+   --   if gToMove is empty and gToolPaletteStatus is "drawing" then --we weren't touching a painspot button, test for drawings...
+   if gToMove is empty and gToolPaletteStatus is "moving" then --we weren't touching a painspot button, test for drawings...
+      put the keys of gDrawingPageArr[gCurrentPage][gCurrentView] into lTheDrawings
+      sort lines of lTheDrawings descending text --items that are drawn later should be found first...
+      repeat for each line theDrawing in lTheDrawings -- the keys of gDrawingPageArr[gCurrentPage][gCurrentView]
+         if (the visible of grc theDrawing is true) and (tMLoc is within the rect of grc theDrawing) then
+            set the loc of grc "toucher" to tMLoc
+            show grc "toucher"
+            wait for 1 tick with messages
+            if intersect(grc theDrawing,  grc "toucher","pixels") then
+               hide grc "toucher"
+               put theDrawing into gToMove
+               hide grc "PSHighlight" --hide it
+               hide grp "PSProperties"
+               hide grc "Pointer"
+               hide image "gremlin"
+               put the loc of grc gToMove into lGrcLoc
+               put the loc of grc gToMove into gCPSOriginalLoc
+               put item 1 of tMLoc into lMouseH
+               put item 2 of tMLoc into lMouseV
+               put lMouseH - (item 1 of lGrcLoc) into lHOffset
+               put lMouseV - (item 2 of lGrcLoc) into lVOffset
+               set the cpHOffset of  grc gToMove to lHOffset
+               set the cpVOffset of  grc gToMove to lVOffset
+               put true into lObjectFound
+               
+               SetDropShadow "grc" && quote & gToMove & quote
+               set the blendlevel of grc gToMove to 10
+               
+               exit repeat
+            end if
+         end if
+         hide grc "toucher" --just in case we invoked it, but it didn't match
+      end repeat
+   end if
+   if gToMove is empty then --we weren't touching down in a drawing either...
+      if (gToolPaletteStatus is "drawing") then
+         if (tMLoc is within the rect of grc "DrawLimit") then
+            StartToDraw pTouchID,"" --we don't know which body this drawing is within.
+         end if
+      else --we aren't in drawing mode...
+         if (the visible of image "front" is true) and within(image "front",tMLoc) then --we effectively tapped on the front
+            BodyTouchStart pTouchID,"front" 
+              
+         else
+            if (the visible of image "back" is true) and within(image "back",tMLoc) then
+               BodyTouchStart pTouchID,"back"
+            end if
+         end if
+       end if
+   end if
+   
+end TouchStart
+
+
+on touchMove pTouchID, pX, pY
+   local lHoriz,lVert
+   if  allowDraw is true then
+      --check that we're restricted within the drawing rectangle. DrawLimit
+      if mouseloc() is within the rect of grc "DrawLimit" then
+         set points of grc "draw" to points of grc "draw" & LF & mouseLoc()
+      end if
+   else
+      if gTextTouchInProgress is not empty then
+         put item 1 of gInitialTextTouchLoc into lHoriz
+         put item 2 of gInitialTextTouchLoc into lVert
+         if not TextTouchStillWithinTargetArea(lHoriz,lVert) then
+            CheckAndClearTextTouchInProgress
+         end if
+      end if
+      if gToMove is not empty then
+         if mouseloc() is within the rect of grp "Trash" then
+            show image "trashcanlarge"
+            hide image "trashcansmall"
+         else
+            show image "trashcansmall"
+            hide image "trashcanlarge"
+         end if
+         if gToMove contains "painSpot" then
+            put the cpHOffset of btn gToMove into lHOffset
+            put the cpVOffset of btn gToMove into lVOffset
+            
+            set the loc of btn gToMove to pX-lHOffset, pY-lVOffset
+            
+            --now check to see if we just left a bodyview image
+            
+            put the loc of btn gToMove into lLoc
+            if the visible of image "front" is true then
+               if within(image "front", lLoc) then
+                  --we are still within the image "front"
+                  put lLoc into gLastValidCoord --this is still a valid coord in this image
+               end if
+            end if
+            if the visible of image "back" is true then
+               if within(image "back", lLoc) then
+                  --we are still within the image "back"
+                  put lLoc into gLastValidCoord --this is still a valid coord in this image
+               end if
+            end if
+            if the visible of image "ZoomImage" is true then
+               if within(image "ZoomImage", lLoc) then
+                  --we are still within the image "ZoomImage"
+                  put lLoc into gLastValidCoord --this is still a valid coord in this image
+               end if
+            end if
+         else
+            if gToMove contains "Draw" then --it's a drawing (a graphic)
+               put the cpHOffset of grc gToMove into lHOffset
+               put the cpVOffset of grc gToMove into lVOffset
+               set the loc of grc gToMove to pX-lHOffset, pY-lVOffset
+            else
+               set the loc of image gToMove to pX, pY
+            end if
+         end if
+      end if
+   end if
+end touchMove
+
+
+on touchEnd pTouchID
+   local lFileName, lLocOffset, lImgLoc, tMLoc
+   
+   put the mouseloc into tMLoc
+   if the mouseloc is within the rect of grp "gear" then
+      send TouchEnd to grp "gear"
+      exit TouchEnd
+   end if
+   
+   if (the visible of img "rotate" is true) and (tMLoc is within the rect of img "rotate") then
+      send TouchEnd to img "rotate"
+      exit TouchEnd
+   end if
+   
+   if allowDraw then --we have a new drawing that we have just completed.
+      put false into allowDraw --stop drawing
+      put "draw" & the ticks into lnewDrawingName
+      set the name of grc "draw" to lnewDrawingName
+      
+      DrawScaledLine lnewDrawingName
+      
+      if the cpAttachedTo of grc lnewDrawingName is empty then --we started drawing on the backdrop - which body view does this belong to?
+         SetDrawingcpAttachedToProperty lnewDrawingName
+      end if
+      
+      --now we know which body view this is attached to, we can figure out its location offset
+      put CalculateDrawingOffset(lnewDrawingName) into lOffset
+      set the cpLocOffset of grc lnewDrawingName to lOffset
+      put true into gDrawingPageArr[gCurrentPage][gCurrentView][lnewDrawingName]
+      FlagCurrentPageAsDirty
+   else --we are not doing a new drawing
+      CheckAndClearTextTouchInProgress
+      if gToMove contains "painSpot" then --we're moving a pain spot button
+         FlagCurrentPageAsDirty
+         if gToMove is not empty then
+            if intersect(btn gToMove,grp "Toolset") then --we touched up in the toolset while moving a painspot.
+               deleteAnimatedButton gToMove --delete the button and remove it from the various data structures
+               put empty into gToMove
+            else
+               if intersect(btn gToMove,image "front") and (within(image "front", the loc of btn gToMove) is false)  then
+                  if gLastValidCoord is not empty then
+                     move btn gToMove to gLastValidCoord in 2 ticks --we need to move back to a valid coord in the body image
+                  end if
+               end if
+               if within(image "front", the loc of btn gToMove) then
+                  set the cpAttachedTo of btn gToMove to "front"
+                  put CalculateImgOffset(gToMove) into lOffset
+                  set the cpLocOffset of btn gToMove to lOffset
+                  DrawOrMoveScaledPainSpot gToMove
+                  HighLightPainSpotAndShowPropertiesPalette gToMove
+               else
+                  if within(image "back", the loc of btn gToMove) then
+                     set the cpAttachedTo of btn gToMove to "back"
+                     put CalculateImgOffset(gToMove) into lOffset
+                     set the cpLocOffset of btn gToMove to lOffset
+                     DrawOrMoveScaledPainSpot gToMove
+                     HighLightPainSpotAndShowPropertiesPalette gToMove
+                  else
+                     if within(image "ZoomImage", the loc of btn gToMove) then
+                        set the cpAttachedTo of btn gToMove to gCurrentView
+                        put CalculateImgOffset(gToMove) into lOffset
+                        set the cpLocOffset of btn gToMove to lOffset
+                        DrawOrMoveScaledPainSpot gToMove
+                        HighLightPainSpotAndShowPropertiesPalette gToMove
+                     else  --the dragged btn has not been released on a body view  
+                        if  tMLoc is within the rect of grp "Trash" then
+                           QuicklyHidePSPropsPaletteAndDeselectCurrentPainSpot -- was FadeOutPSPropsPalette
+                           deleteAnimatedButton gToMove --delete the button and remove it from the various data structures
+                           hide image "trashcanlarge"
+                           ExplodeAnObject
+                           show image "trashcansmall"
+                        else -- we released the painspot but not in the bin - zoom it back
+                           if gLastValidCoord is not empty then
+                              move btn gToMove to gLastValidCoord in 2 ticks --we need to move back to a valid coord in the body image
+                           else
+                              --no valid last location for the painspot. Delete it.
+                              deleteAnimatedButton gToMove --delete the button and remove it from the various data structures
+                              put empty into gToMove
+                           end if
+                        end if
+                     end if
+                  end if
+               end if
+            end if
+         end if
+      else --we're not moving a pain spot - presumably its an emotion face.
+         if gToMove contains "face" then
+            FlagCurrentPageAsDirty
+            if the visible of image "front" is true then
+               if gCurrentEmotion is not empty then
+                  hide image "Emotion"
+                  SESetupEmotion gCurrentEmotion
+                  move image "DragFace" to the loc of image "Emotion" in cEmotZoomSpeed ticks
+                  hide image "DragFace"
+                  show image "Emotion"
+               end if
+               put empty into gToMove
+            end if
+         else
+            if gToMove contains "Draw" then --we're moving a drawing! (and we just let go of it)
+               FlagCurrentPageAsDirty
+               
+               --ClearDropShadow "grc" && quote & gToMove & quote
+               set the blendlevel of grc gToMove to cFullOn --was 0. Now drawings always have a blend <>0
+               
+               if  tMLoc is within the rect of grp "Trash" then
+                  deleteDrawing gToMove --delete the drawing and remove it from the various data structures
+                  hide image "trashcanlarge"
+                  ExplodeAnObject
+                  show image "trashcansmall"
+               else
+                  SetDrawingcpAttachedToProperty gToMove --figure out what it's now attached to
+                  put CalculateDrawingOffset(gToMove) into lOffset --calculate the location offset for drawing purposes.
+                  set the cpLocOffset of grc gToMove to lOffset
+                  MoveScaledLine gToMove
+               end if
+            else
+               FadeOutPSPropsPalette
+               hide grc "PSHighlight"
+               put empty into gCurrentPainSpot
+            end if
+         end if
+      end if
+   end if
+   put empty into gLastValidCoord
+   put empty into gToMove
+   put empty into gTextTouchInProgress
+   put empty into gBackdropTouchDown
+end touchEnd
+
+
+
+
+command DrawScaledLine pWhichPoly
+   local tScaleFactor, tMiniPoly, tHOffset, tVOffset, tOrigWidth, tOrigHeight, tMiniImgLoc, tMPProps
+   if gShowZoomPalette is true then
+      put (the width of img gCurrentView) / gViewWidthsArr[gCurrentView]  into tScaleFactor --width of mini icon / width of big image
+      put pWhichPoly & "-scaled" into tMiniPoly
+      put the loc of img gCurrentView into tMiniImgLoc
+      if (gCurrentView is "FrontAndBack") and ((gShowTwoViews is false) and ( gShowWhichSingleBodyView is "back" )) then
+         put (gViewWidthsArr[gCurrentView]  div 2) - ((the right of img "back") - (item 1 of the loc of grc pWhichPoly)) into tHOffset
+      else
+         put (item 1 of the loc of grc pWhichPoly) - (item 1 of the loc of img "ZoomImage") into tHOffset
+      end if
+      put (item 2 of the loc of grc pWhichPoly) - (item 2 of the loc of img "ZoomImage") into tVOffset
+      clone invisible grc pWhichPoly
+      set the name of it to tMiniPoly
+      put the width of grc tMiniPoly into tOrigWidth
+      put the height of grc tMiniPoly into tOrigHeight
+      set the linesize of grc tMiniPoly to round (((the linesize of grc pWhichPoly) * tScaleFactor) + 1)
+      set the width of grc tMiniPoly to round(tOrigWidth * tScaleFactor)
+      set the height of grc tMiniPoly to round(tOrigHeight * tScaleFactor)
+      set the loc of grc tMiniPoly to ((tHOffset * tScaleFactor) + item 1 of tMiniImgLoc),((tVOffset * tScaleFactor) + item 2 of tMiniImgLoc)
+      show grc tMiniPoly
+      --record the minipoly into the data structure so we can redraw it when we change page...
+      SaveMiniPolyInfo tMiniPoly
+      set the script of grc tMiniPoly to the script of btn "MiniPolyScript" -- these will pass a touchup to the zoompalette group
+   end if
+end DrawScaledLine
+
+
+on DrawOrMoveScaledPainSpot pWhichPainspot
+   local tScaleFactor, tThePSType, tMiniPS, tMiniImgLoc, tHOffset, tVOffset
+   if gShowZoomPalette is true then
+      put (the width of img gCurrentView) / gViewWidthsArr[gCurrentView]  into tScaleFactor --width of mini icon / width of big image
+      put the cpPSType of btn pWhichPainspot into tThePSType
+      if tThePSType is among the items of  "cloud,ellipse,spikes,flash,itchy,slash,query,nopain,fire" then --only the listed pain types (all of them at the mo).
+         put pWhichPainspot & "-scaled" into tMiniPS
+         put the loc of img gCurrentView into tMiniImgLoc
+         if (gCurrentView is "FrontAndBack") and ((gShowTwoViews is false) and ( gShowWhichSingleBodyView is "back" )) then
+            --         --         --offset of PS horiz loc from the right of the righthand body view when shown on the left
+            --         --         put ((item 1 of the loc of btn pWhichPainspot) - the right of img "back") into tOffsetFTR 
+            --         --         put (item 1 of the loc of img "ZoomImage") +  (gViewWidthsArr[gCurrentView] div 2) - tOffsetFTR 
+            
+            --         put (item 1 of the loc of btn pWhichPainspot) - (item 1 of the loc of img "ZoomImage") + (gViewWidthsArr[gCurrentView] div 2)  \
+               --               into tHOffset
+            
+            put (gViewWidthsArr[gCurrentView]  div 2) - ((the right of img "back") - (item 1 of the loc of btn pWhichPainspot)) into tHOffset
+         else
+            put (item 1 of the loc of btn pWhichPainspot) - (item 1 of the loc of img "ZoomImage") into tHOffset
+         end if
+         put (item 2 of the loc of btn pWhichPainspot) - (item 2 of the loc of img "ZoomImage") into tVOffset
+         if there is not a grc tMiniPS then
+            clone invisible grp ("mini_" & tThePSType)
+            set the name of it to tMiniPS
+         end if
+         set the loc of grp tMiniPS to ((tHOffset * tScaleFactor) + item 1 of tMiniImgLoc),((tVOffset * tScaleFactor) + item 2 of tMiniImgLoc)
+         show grp tMiniPS
+         saveMiniPSInfo tMiniPS, tThePSType
+         set the script of grp tMiniPS to the script of btn "MiniPolyScript" -- these will pass a touchup to the zoompalette group
+      end if
+   end if
+end DrawOrMoveScaledPainSpot
+
+
+command MoveScaledLine pWhichPoly
+   local tScaleFactor, tMiniPoly, tHOffset, tVOffset, tOrigWidth, tOrigHeight, tMiniImgLoc
+   if gShowZoomPalette is true then
+      if the visible of img "ZoomImage" is true then -- Body views need a bit more thought...
+         put (the width of img gCurrentView) / (the width of img "ZoomImage")  into tScaleFactor
+      else
+         put (the width of img gCurrentView) / ((the right of img "back") - (the left of img "front")) into tScaleFactor
+      end if
+      put pWhichPoly & "-scaled" into tMiniPoly
+      put the loc of img gCurrentView into tMiniImgLoc
+      if (gCurrentView is "FrontAndBack") and ((gShowTwoViews is false) and ( gShowWhichSingleBodyView is "back" )) then
+         put (gViewWidthsArr[gCurrentView]  div 2) - ((the right of img "back") - (item 1 of the loc of grc pWhichPoly)) into tHOffset
+      else
+         put (item 1 of the loc of grc pWhichPoly) - (item 1 of the loc of img "ZoomImage") into tHOffset
+      end if
+      put (item 2 of the loc of grc pWhichPoly) - (item 2 of the loc of img "ZoomImage") into tVOffset
+      put the width of grc tMiniPoly into tOrigWidth
+      put the height of grc tMiniPoly into tOrigHeight
+      set the loc of grc tMiniPoly to ((tHOffset * tScaleFactor) + item 1 of tMiniImgLoc),((tVOffset * tScaleFactor) + item 2 of tMiniImgLoc)
+      SaveMiniPolyInfo tMiniPoly --update the minipoly data for this drawing.
+   end if
+end MoveScaledLine
+
+
+command SaveMiniPolyInfo pWhichMiniPoly
+   local tMPProps
+   put the linesize of grc pWhichMiniPoly & return into tMPProps
+   put the foregroundColor of grc pWhichMiniPoly after tMPProps
+   put tMPProps & return & the points of grc pWhichMiniPoly into gScaledDrawingPageArr[gCurrentPage][gCurrentView][pWhichMiniPoly]
+end SaveMiniPolyInfo
+
+
+command saveMiniPSInfo pWhichMiniPS, pThePSType 
+   put pThePSType & return & the loc of grp pWhichMiniPS into gScaledPSPageArr[gCurrentPage][gCurrentView][pWhichMiniPS]
+end saveMiniPSInfo
+
+
+command DeleteScaledLine pWhichPoly
+   local tMiniPoly
+   put pWhichPoly & "-scaled" into tMiniPoly
+   if there is a grc tMiniPoly of cd "Somatic" then
+      delete grc tMiniPoly of cd "Somatic"
+   end if
+end DeleteScaledLine
+
+
+command DeleteMiniPainSpot pWhichPainSpot
+   local tMiniPS
+   put pWhichPainspot & "-scaled" into tMiniPS
+   if there is a grp tMiniPS of cd "Somatic" then
+      delete grp tMiniPS of cd "Somatic"
+   end if
+end DeleteMiniPainSpot
+
+
+command HighLightPainSpotAndShowPropertiesPalette pWhichPainSpot
+   if the cpPSType of btn pWhichPainSpot is not "nopain" then --i.e. only allow properties to be changed on standard pain spots.
+      SetAndHighlightCurrentPainSpot pWhichPainSpot --also sets gCurrentPainSpot
+      InitPSPrefsAnimations  (the cpPSType of btn pWhichPainSpot)
+      send SetupPSLabel to grp "PSProperties"
+      FadeInPSPropsPalette pWhichPainSpot
+      AnimateBtn pWhichPainSpot
+   end if
+end HighLightPainSpotAndShowPropertiesPalette
+
+
+
+on TouchRelease
+   if allowdraw then
+      if there is a grc "draw" then
+         delete grc "draw"
+      end if
+      put empty into allowdraw
+   end if
+end TouchRelease
+
+
+on SetDrawingcpAttachedToProperty pWhichDrawing
+   if gCurrentView is "frontAndBack" then
+      if gShowTwoViews is true then --two body views on show - we need to figure out which one is the best one
+         if intersect(grc pWhichDrawing, image "front") then
+            set the cpAttachedTo of grc pWhichDrawing to "front"
+         else
+            if intersect(grc pWhichDrawing, image "back") then
+               set the cpAttachedTo of grc pWhichDrawing to "back"
+            else
+               --we have two bodies on show and the drawing does not intersect either of them.
+               put item 1 of the loc of grc pWhichDrawing into theH
+               put (((item 1 of the loc of image "back") - (item 1 of the loc of image "front")) div 2) + (item 1 of the loc of image "front") into lBVMiddle
+               if theH > lBVMiddle then --the centre of the drawing is on the right of the centre of the body views
+                  set the cpAttachedTo of grc pWhichDrawing to "back"
+               else--the centre of the drawing is on the left of the centre of the body views
+                  set the cpAttachedTo of grc pWhichDrawing to "front"
+               end if
+            end if
+         end if
+      else --only one body view on show - it must be connected to this one
+         set the cpAttachedTo of grc pWhichDrawing to gShowWhichSingleBodyView
+      end if
+   else --we are showing something other than the standard body view
+      if intersect(grc pWhichDrawing, image "ZoomImage") then
+         set the cpAttachedTo of grc pWhichDrawing to gCurrentView
+      end if
+   end if
+end SetDrawingcpAttachedToProperty
+
+
+on SESetupEmotion pWhichEmotion
+   set the lockloc of image "Emotion" to false
+   put "./graphics/emotion faces/large emotions/emotion" && pWhichEmotion & ".png" into lFileName
+   set the filename of image "Emotion" to lFileName
+   PlaceEmotion pWhichEmotion
+end SESetupEmotion
+
+
+on deleteAnimatedButton pWhichButton
+   delete global gAnimatedBtns[pWhichButton] 
+   delete btn pWhichButton
+   deleteMiniPainSpot pWhichButton
+   delete global gPainSpotPageArr[gCurrentPage][gCurrentView][pWhichButton] --and remove it from the list of pain spot buttons for this page
+end deleteAnimatedButton
+
+
+command deleteDrawing pWhichDrawing
+   delete grc pWhichDrawing
+   DeleteScaledLine pWhichDrawing
+   delete global gDrawingPageArr[gCurrentPage][gCurrentView][pWhichDrawing] --and remove it from the list of drawings for this page
+end deleteDrawing
+
+
+command AddANewPage
+   add 1 to gPageCount --we now have 1 more new page
+   DoPageFlip (gPageCount - gCurrentPage)
+end AddANewPage
+
+
+command RotateBodyView pWhichDirection
+   QuicklyHidePSPropsPaletteAndDeselectCurrentPainSpot
+   TakeScreenShot
+   SavePageAndViewData gCurrentView,true
+   delete global  gPageDirtyFlagArr[gCurrentPage][gCurrentView]
+   
+   if gShowWhichSingleBodyView is "front" then
+      put "back" into gShowWhichSingleBodyView
+   else
+      put "front" into gShowWhichSingleBodyView
+   end if
+   lock screen for visual effect in rect (the rect of grc "VisEffectR" of cd "Somatic") --gBodyVisEffectRect --(the rectangle of image "front")
+   send deselectCurrentPainSpot to cd "Somatic"
+   DrawBodyViews
+   if (gCurrentEmotion is not empty) and gShowWhichSingleBodyView is "front" then
+      show image "Emotion" of cd "Somatic"
+   else
+      hide image "Emotion" of cd "Somatic"
+   end if
+   DrawAllPainSpots
+   DrawAllDrawings 
+   if pWhichDirection is left then 
+      unlock screen with visual effect flip right fast
+   else
+      unlock screen with visual effect flip left fast
+   end if
+end RotateBodyView
+
+
+command ChangeView pNewView
+   QuicklyHidePSPropsPaletteAndDeselectCurrentPainSpot
+   lock screen -- for visual effect
+   StopAnimation
+   hide image "gremlin" of cd "Somatic"
+   SaveCurrentPageAndViewPainSpotInfo
+   SaveCurrentPageAndViewDrawingInfo
+   put gCurrentEmotion into gPageEmotionArr[gCurrentPage] --no emotions relevant in other views
+   if gPageDirtyFlagArr[gCurrentPage][gCurrentView] then
+      wait for 5 ticks with messages --give stuff a chance to draw (and the PS properties palette a chance to vanish
+      TakeScreenShot
+      SavePageAndViewData gCurrentView,true --save the data for the current view to the relevant data file.
+      --note that for the case of a one-up FrontAndBack view, the screenshot will just be one-up view, but the data
+      --file will be of all the data i.e. for both front and back.
+      delete global  gPageDirtyFlagArr[gCurrentPage][gCurrentView] --we've taken the screenshot, page no longer dirty.
+   end if
+   ClearCurrentPage false
+   hide image "emotion"
+   
+   set the cpViewImage of img "ZoomImage" to pNewView
+   put pNewView into gCurrentView
+   
+   RestoreCurrentPageAndViewPainSpotInfo false
+   RestoreCurrentPageAndViewDrawingInfo false
+   
+   UpdateDescriptionContents
+   DrawNavigationControls
+   
+   DrawAllPainSpots
+   DrawAllDrawings
+   if (gCurrentEmotion is not empty) and ((gCurrentView is "FrontAndBack")) then 
+      PlaceEmotion gCurrentEmotion
+      if  gShowTwoViews is true or ((gShowTwoViews is false) and  (gShowWhichSingleBodyView is "front")) then
+         show image "Emotion"
+      end if
+   end if
+   HandleToolPaletteStatus
+   
+   StartAnimation
+   PlaceLRGuidance
+   DrawLRGuidance
+   unlock screen
+end ChangeView
+
+
+command DrawView pWhichView
+   if pWhichView is "FrontAndBack" then --if it's front and back we need to show those rather than a Zoomed view
+      set the filename of img "ZoomImage" to ""
+      HideOrShowEmotionsPalette "show"
+      DrawBodyViews
+   else
+      set the filename of img "ZoomImage" to "./graphics/ZoomedViews/" & pWhichView & " view.png"
+      HideOrShowEmotionsPalette "hide"
+      DrawBodyViews "Zoomed"
+   end if
+end DrawView
+
+
+on DoPageFlip pWhichDirection
+   lock screen for visual effect
+   StopAnimation
+   QuicklyHidePSPropsPaletteAndDeselectCurrentPainSpot
+   hide image "gremlin" of cd "Somatic"
+   SaveCurrentPageAndViewPainSpotInfo
+   SaveCurrentPageAndViewDrawingInfo
+   put gCurrentEmotion into gPageEmotionArr[gCurrentPage] --no emotions relevant in other views
+   if gPageDirtyFlagArr[gCurrentPage][gCurrentView] then
+      wait for 5 ticks with messages --give stuff a chance to draw (and the PS properties palette a chance to vanish
+      TakeScreenShot
+      SavePageAndViewData
+      delete global  gPageDirtyFlagArr[gCurrentPage][gCurrentView] --we've taken the screenshot, page no longer dirty.
+   end if
+   ClearCurrentPage true 
+   
+   if pWhichDirection > 0 then
+      add 1 to gCurrentPage
+      if gCurrentPage > gPageCount then 
+         put 1 into gCurrentPage
+      end if
+   else
+      subtract 1 from gCurrentPage
+      if gCurrentPage< 1 then 
+         put gPageCount into gCurrentPage
+      end if
+   end if
+   
+   --create the painspots and drawings originally found on this view
+   RestoreCurrentPageAndViewPainSpotInfo false
+   RestoreCurrentPageAndViewDrawingInfo false -- don't restore the mini poly's on the zoom palette
+   
+   RestoreZoomPalette
+   
+   put gPageEmotionArr[gCurrentPage] into gCurrentEmotion
+   hide image "Emotion"
+   if gCurrentEmotion is not empty then
+      SESetupEmotion gCurrentEmotion
+      show image "Emotion"
+   end if
+   
+   UpdateDescriptionContents
+   DrawNavigationControls
+   
+   DrawAllPainSpots
+   DrawAllDrawings
+   PlaceEmotion gCurrentEmotion
+   
+   HandleToolPaletteStatus
+   
+   StartAnimation
+   
+   --finally, reveal the new painspot configuration
+   if pWhichDirection > 0 then
+      unlock screen with visual effect curl up --curl
+   else
+      unlock screen with visual effect curl down
+   end if
+end DoPageFlip
+
+
+--need to retrieve all the important custom property-based info for pain spot buttons and save it to the array
+command SaveCurrentPageAndViewPainSpotInfo
+   put the keys of gPainSpotPageArr[gCurrentPage][gCurrentView] into lButtonList  -- i.e. return all the keys of the other dimension of the array for this page
+   repeat for each line theButton in lButtonList
+      if there is a button theButton then
+         put the cpPSType of btn theButton into lcpPSType
+         put the cpThrobRate of btn theButton into lcpThrobRate
+         put the cpSize of btn theButton into lcpSize
+         put the cpPSLabel of btn theButton into lcpPSLabel
+         put the cpAttachedTo of btn theButton into lcpAttachedTo  --what view was it attached to?
+         put the cpLocOffset of btn theButton into lcpLocOffset
+         put lcpPSType & "|" & lcpThrobRate & "|" & lcpSize & "|" & lcpPSLabel & "|" & lcpAttachedTo & "|" & lcpLocOffset into gPainSpotPageArr[gCurrentPage][gCurrentView][theButton]
+      end if
+   end repeat
+end SaveCurrentPageAndViewPainSpotInfo
+
+
+command SaveCurrentPageAndViewDrawingInfo
+   put the keys of gDrawingPageArr[gCurrentPage][gCurrentView] into lDrawingList  -- i.e. return all the keys of the other dimension of the array for this page
+   repeat for each line theDrawing in lDrawingList
+      if there is a grc theDrawing then
+         put the cpAttachedTo of grc theDrawing into lcpAttachedTo  --what view was it attached to?
+         put the cpLocOffset of grc theDrawing into lcpLocOffset
+         put the linesize of grc theDrawing into lcpLineSize
+         put the foregroundColor of grc theDrawing into lcpForegroundColor
+         put the colourName of grc theDrawing into lColourName
+         put the points of grc theDrawing into lcpPoints
+         replace return with tab in lcpPoints
+         put lcpAttachedTo & "|" & lcpLocOffset & "|" &  lcpLineSize & "|" & lcpForegroundColor & "|" & lColourName & "|" & lcpPoints into gDrawingPageArr[gCurrentPage][gCurrentView][theDrawing]
+      end if
+   end repeat
+end SaveCurrentPageAndViewDrawingInfo
+
+
+
+
+command ClearCurrentPage pDeleteScaledItems
+   --clears all possible pain spot and drawing images from the current page (for all views).
+   repeat for each item aBodyView in cViewList
+      put the keys of gPainSpotPageArr[gCurrentPage][aBodyView] into lButtonList
+      repeat for each line theButton in lButtonList
+         if there is a btn theButton of cd "Somatic" then
+            delete global gAnimatedBtns[theButton] 
+            delete btn theButton of cd "Somatic"
+         end if
+         if pDeleteScaledItems is true then
+            DeleteMiniPainSpot theButton
+         end if
+      end repeat
+      put the keys of gDrawingPageArr[gCurrentPage][aBodyView] into lDrawingList
+      repeat for each line theDrawing in lDrawingList
+         if there is a grc theDrawing of cd "Somatic" then
+            delete grc theDrawing of cd "Somatic"
+         end if
+         if pDeleteScaledItems is true then --try to delete the scaled drawing anyway
+            DeleteScaledLine theDrawing
+         end if
+      end repeat
+   end repeat
+end ClearCurrentPage
+
+
+command PurgeScaledStuffFromZoomPalette
+   local numGroups, grpName, delList, theGroup
+   local numGraphics, grcName, theGrc
+   put the number of grps of cd "Somatic" into numGroups
+   repeat with looper=1 to numGroups
+      put the name of grp looper of cd "Somatic" into grpName
+      if grpName contains "-scaled" then 
+         put grpName & return after delList
+      end if
+   end repeat
+   repeat for each line theGroup in delList
+      delete grp theGroup of cd "Somatic"
+   end repeat
+   
+   put empty into delList
+   put the number of graphics of cd "Somatic" into numGraphics
+   repeat with looper=1 to numGraphics
+      put the name of grc looper of cd "Somatic" into grcName
+      if grcName contains "-scaled" then 
+         put grcName & return after delList
+      end if
+   end repeat
+   repeat for each line theGrc in delList
+      delete grc theGrc of cd "Somatic"
+   end repeat
+end PurgeScaledStuffFromZoomPalette
+
+
+command RestoreCurrentPageAndViewPainSpotInfo pAlsoDrawScaledItems
+   put the keys of gPainSpotPageArr[gCurrentPage][gCurrentView] into lButtonList
+   repeat for each line theButton in lButtonList
+      put gPainSpotPageArr[gCurrentPage][gCurrentView][theButton] into lButtonData
+      clone btn "PainspotTMPL" of cd "Somatic"
+      set the name of it to theButton
+      set the itemdelimiter to "|"
+      set the cpPSType of btn theButton to item 1 of lButtonData
+      if item 1 of lButtonData is "nopain" then
+         set the icon of btn theButton of cd "Somatic" to cNoPainID
+      else
+         put item 1 of lButtonData into gAnimatedBtns[theButton] --put it back into the data structure
+         set the cpThrobRate of btn theButton to item 2 of lButtonData
+         set the cpSize of btn theButton to item 3 of lButtonData
+         set the cpPSLabel of btn theButton to item 4 of lButtonData
+      end if
+      set the cpAttachedTo of btn theButton to item 5 of lButtonData
+      set the cpLocOffset of btn theButton to item 6 of lButtonData
+      if pAlsoDrawScaledItems is true then
+         DrawScaledPainSpot theButton
+      end if
+   end repeat
+end RestoreCurrentPageAndViewPainSpotInfo
+
+
+command RestoreCurrentPageAndViewDrawingInfo pAlsoDrawScaledItems
+   put the keys of gDrawingPageArr[gCurrentPage][gCurrentView] into lDrawingList  -- i.e. return all the keys of the other dimension of the array for this page
+   repeat for each line theDrawing in lDrawingList
+      put gDrawingPageArr[gCurrentPage][gCurrentView][theDrawing] into lDrawingData
+      clone grc "DrawTemplateGraphic" --it will already have a custom property called "colourName"
+      set the name of it to theDrawing
+      set the itemdelimiter to "|"
+      set the cpAttachedTo of grc theDrawing to item 1 of lDrawingData
+      set the cpLocOffset of grc theDrawing to item 2 of lDrawingData
+      set the linesize of grc theDrawing to item 3 of lDrawingData
+      set the foregroundColor of grc theDrawing to item 4 of lDrawingData
+      set the colourName of grc theDrawing to item 5 of lDrawingData
+      put item 6 of lDrawingData into lThePoints
+      replace tab with return in lThePoints
+      set the points of grc theDrawing to lThePoints
+      if pAlsoDrawScaledItems is true then
+         DrawScaledLine theDrawing
+      end if
+   end repeat
+end RestoreCurrentPageAndViewDrawingInfo
+
+
+command RestoreZoomPalette
+   local tMiniPolyList, tMPData
+   repeat for each item theView in cViewList 
+      put the keys of gScaledDrawingPageArr[gCurrentPage][theView] into tMiniPolyList
+      repeat for each line theMiniPoly in tMiniPolyList
+         put gScaledDrawingPageArr[gCurrentPage][theView][theMiniPoly] into tMPData
+         if the number of lines of tMPData > 3 then
+            clone grc "DrawTemplateGraphic"
+            set the name of it to theMiniPoly
+            set the linesize of grc theMiniPoly to line 1 of tMPData
+            set the foregroundColor of grc theMiniPoly to line 2 of tMPData
+            delete line 1 to 2 of tMPData
+            set the points of grc theMiniPoly to tMPData --which also sets the location for the polygon
+            show grc theMiniPoly
+            set the script of grc theMiniPoly to the script of btn "MiniPolyScript" -- these will pass a touchup to the zoompalette group
+         end if
+      end repeat
+      
+      put the keys of gScaledPSPageArr[gCurrentPage][theView] into tMiniPainSpotList
+      repeat for each line tMiniPainSpot in tMiniPainSpotList
+         put gScaledPSPageArr[gCurrentPage][theView][tMiniPainSpot] into tMPSData
+         put line 1 of tMPSData into tPSType
+         clone grp ("mini_" & tPSType) 
+         set the name of it to tMiniPainSpot
+         set the loc of grp tMiniPainSpot to line 2 of tMPSData
+         show grp tMiniPainSpot
+         set the script of grp tMiniPainSpot to the script of btn "MiniPolyScript" -- these will pass a touchup to the zoompalette group
+      end repeat
+   end repeat
+end RestoreZoomPalette
+
+
+
+command PlaceEmotion pWhichEmot
+   set the lockloc of image "Emotion" to false
+   put the filename of image "Emotion" into tTheFileName
+   set the filename of image "Emotion" to empty
+   set the filename of image "Emotion" to tTheFileName
+   
+   put line pWhichEmot of the cpEmotLocOffsets of image "front" of cd "somatic" into tLocOffset
+   put line cEmotScaleFactorItem of the cpEmotLocOffsets of image "person" of cd "emotions" into tEmotScaleFactor
+   set the lockloc of image "Emotion" to true
+   set the width of image "Emotion" to round((the width of img "Emotion") * tEmotScaleFactor)
+   set the height of image "Emotion" to round((the height of img "Emotion") * tEmotScaleFactor)
+   
+   put the loc of image "front" into tImgLoc
+   set the loc of image "Emotion" to (item 1 of tLocOffset + item 1 of tImgLoc),(item 2 of tLocOffset + item 2 of tImgLoc)   
+   --   put the cpEmotLoc of image "front" into lLocOffset
+   --   put the loc of image "front" into lImgLoc
+   --   set the loc of image "Emotion" to (item 1 of lLocOffset + item 1 of lImgLoc),(item 2 of lLocOffset + item 2 of lImgLoc)
+end PlaceEmotion
+
+
+command SPrefsTouch pWhichOption
+   constant cShowZoomPalette = 1
+   constant cShowFandBImages = 2
+   constant cShowVandPImages = 3
+   constant cEnableGremlinMode = 4
+   constant cEnableFireObject= 5
+   constant cEnableNoPainObject = 6
+   constant cEnable12Swatches = 7
+   constant cShowLRGuidance = 8
+   
+   set the visible of image ("tick" & pWhichOption) to  not (the visible of image ("tick" & pWhichOption)) --toggle the selected item
+   switch pWhichOption
+      case cShowZoomPalette --show zoom palette
+         put the visible of image "tick1" into gShowZoomPalette
+         put gShowZoomPalette into gPrefs["ShowZoomPalette"]
+         set the visible of grp "ZoomPalette" of cd "Somatic" to gShowZoomPalette
+         if (gShowZoomPalette is false) and (gCurrentView <> "FrontAndBack") then
+            DrawZoomViewHighlightRect "FrontAndBack"
+            ChangeView "FrontAndBack"
+            DrawView "FrontAndBack"
+         end if
+         break
+         
+      case cShowFandBImages --do we draw two bodies or one?
+         put the visible of image "tick2" into gShowTwoViews
+         put gShowTwoViews into gPrefs["ShowTwoBodyViews"]
+         put "front" into gShowWhichSingleBodyView
+         if gCurrentView is "FrontAndBack" then
+            DrawBodyViews
+            PlaceEmotion gCurrentEmotion
+            DrawAllPainSpots
+            DrawAllDrawings
+            SetAndHighlightCurrentPainSpot gCurrentPainSpot
+            PlaceLRGuidance
+         end if
+         break
+         
+      case cShowVandPImages -- use vest and pants images
+         put the visible of image "tick3" into gUseVandPImages
+         SetupPersonImages
+         break
+         
+      case cEnableGremlinMode --gremlin pain spot mode
+         put the visible of image "tick4" into gEnableGremlinMode
+         put gEnableGremlinMode into gPrefs["EnableGremlinMode"}
+         break
+         
+      case cEnableFireObject --show/hide the fire animated shape
+         put the visible of image "tick5" into gShowFireObject
+         if gShowFireObject is true then
+            if gToolPaletteStatus is "painspots" then --we can only show the fire item if we're looking at the painspots tab of the palette
+               show img "fire"
+            else --we weren't in painspots mode - so switch us there so we can see the result of turning on the "fire"
+               SetToolsPaletteStatus "painspots"
+            end if
+         else
+            hide img "fire"
+         end if
+         put gShowFireObject into gPrefs["EnableFireObject"]
+         break
+         
+      case cEnableNoPainObject --enable the "no pain" button
+         put the visible of image "tick6" into gShowNoPainObject
+         if gShowNoPainObject is true then
+            if gToolPaletteStatus is "painspots" then --we can only show the fire item if we're looking at the painspots tab of the palette
+               show img "nopain"
+            else --we weren't in painspots mode - so switch us there so we can see the result of turning on the "no pain"
+               SetToolsPaletteStatus "painspots"
+            end if
+         else
+            hide img "nopain"
+         end if
+         put gShowNoPainObject into gPrefs["EnableNoPainObject"]
+         break
+         
+      case cEnable12Swatches -- show/hide the colour swtaches vs the colour block method of colour selection.
+         put the visible of image "tick7" into gEnableColourSwatches
+         put gEnableColourSwatches into gPrefs["Enable12ColourSwatches"}
+         SetToolsPaletteStatus "drawing","true" --this will cause it be redrawn, with the choice of the 12 swatches, or the blocks
+         break
+         
+      case cShowLRGuidance --show left/right guidance
+         put the visible of image "tick8" into gShowLRGuidance
+         put gShowLRGuidance into gPrefs["ShowLRGuidance"]
+         DrawLRGuidance
+         break
+         
+   end switch
+   SaveStoredPrefs
+end SPrefsTouch
+
+
+ 
+command initSomaticPrefs
+   set the visible of image "tick1" to gShowZoomPalette
+   set the visible of image "tick2" to gShowTwoViews
+   set the visible of image "tick3" to gUseVandPImages
+   set the visible of image "tick4" to gEnableGremlinMode
+   set the visible of image "tick5" to gShowFireObject
+   set the visible of image "tick6" to gShowNoPainObject
+   set the visible of image "tick7" to gEnableColourSwatches
+   set the visible of image "tick8" to gShowLRGuidance
+end initSomaticPrefs
+
+
+
+command SetPSThrob pWhatValue
+    if gCurrentPainSpot is not empty then
+        set the cpThrobRate of btn gCurrentPainSpot to pWhatValue
+        SetupAnimationTickCount gCurrentPainSpot
+        --put ((cTickStartValue - pWhatValue) * cTickMultiplier) into gAnimationTickCount[gCurrentPainSpot]
+    end if
+end SetPSThrob
+
+
+command SetPSSize pWhatValue
+    if gCurrentPainSpot is not empty then
+        set the cpSize of btn gCurrentPainSpot to pWhatValue
+        set the icon of btn gCurrentPainSpot to gAnimations[the cpPSType of btn gCurrentPainSpot][pWhatValue][1]
+    end if
+end SetPSSize
+
+
+command SetAndHighlightCurrentPainSpot pWhatBtn
+    if pWhatBtn is not empty then
+        set the loc of grc "PSHighlight" to the loc of btn pWhatBtn
+        --will need to calculate a size here for the highlight.
+        show grc "PSHighlight"
+        put pWhatBtn into gCurrentPainSpot
+    end if
+end SetAndHighlightCurrentPainSpot
+
+
+command BodyTouchStart pTouchID, pWhichBodyView
+   deselectCurrentPainSpot
+   if gToolPaletteStatus is "painspots" then
+      if gEnableGremlinMode is true then
+         set the loc of image "gremlin" to the mouseLoc
+         show image "gremlin"
+         set the cpAttachedTo of image "gremlin" to pWhichBodyView
+      end if
+   else
+      if gToolPaletteStatus is "drawing" then
+         StartToDraw pTouchID,pWhichBodyView
+      end if
+   end if
+end BodyTouchStart
+
+
+on hidetrashhint
+   repeat with looper=10 to 100 step 10
+      set the blendlevel of grp "TrashHint" to looper
+      wait for 20 milliseconds with messages
+   end repeat
+   hide grp "TrashHint"
+end hidetrashhint
+
+
+on StartToDraw pTouchID,pWhichBodyView
+   if there is a grc "Draw" then --clear up anything that got left lying about half-done. 
+      delete grc "Draw"
+   end if
+   clone invisible grc "DrawTemplateGraphic"
+   set the name of it to "Draw"
+   set the points of graphic "Draw" to mouseloc()
+   set the cpAttachedTo of graphic "Draw" to pWhichBodyView --which body view does this drawning belong to?
+   show grc "Draw"
+   put true into allowDraw
+end StartToDraw
+
+
+on DrawGraphicTouchStart pWhichGrc
+   PJDebug "Attached to:" && the cpattachedTo of grc pWhichGrc
+   PJDebug "Loc Offset:" && the cpLocOffset of grc pWhichGrc
+end DrawGraphicTouchStart
+
+
+on SetDrawingColour pWhatColour
+   set the foregroundColor of grc "DrawTemplateGraphic" to the backgroundColor of grc pWhatColour
+   set the colourName of grc "DrawTemplateGraphic" to the colourName of grc pWhatColour
+   if gEnableColourSwatches is true then
+      set the loc of grc "colourSwatchHighlight" to the loc of grc pWhatColour
+   end if
+   repeat with looper=1 to 4
+      set the foregroundColor of grc ("line" & looper) to the backgroundColor of grc pWhatColour
+   end repeat
+end SetDrawingColour
+
+
+on deselectCurrentPainSpot
+    hide grc "PSHighlight"
+    put empty into gCurrentPainSpot
+    FadeOutPSPropsPalette
+end deselectCurrentPainSpot
+
+
+on FadeOutPSPropsPalette
+    if the visible of grp "PSProperties" is true then --only if it's on show
+        repeat with looper=10 to 100 step 10
+            wait for 10 milliseconds with messages
+            set the blendLevel of grp "PSProperties" to looper
+            set the blendLevel of grc "Pointer" to looper
+        end repeat
+        hide grp "PSProperties" --and hide it
+        hide grc "Pointer"
+    end if
+end FadeOutPSPropsPalette
+ 
+ 
+on QuicklyHidePSPropsPaletteAndDeselectCurrentPainSpot
+   set the blendLevel of grp "PSProperties" of cd "Somatic" to 100
+   set the blendLevel of grc "Pointer" of cd "Somatic"  to 1001
+   hide grp "PSProperties" of cd "Somatic" --and hide it
+   hide grc "Pointer" of cd "Somatic"
+   hide grc "PSHighlight" of cd "Somatic"
+   put empty into gCurrentPainSpot
+end QuicklyHidePSPropsPaletteAndDeselectCurrentPainSpot
+ 
+ 
+command FadeInPSPropsPalette pCurrentPainSpot
+    PlacePSProperties
+    if the visible of grp "PSProperties" is false then --only if it's hidden
+        set the blendLevel of grp "PSProperties" to 100 --fade it up from hidden
+        set the blendLevel of grc "Pointer" to 100
+        show grp "PSProperties" --"show" it completely faded out, so we can fade it in
+        show grc "Pointer"
+        send "SetupThrobRate" &&  (the cpThrobRate of btn gCurrentPainSpot) to grp "PSProperties" of cd "Somatic"
+        send "SetupSize" && (the cpSize of btn gCurrentPainSpot) to grp "PSProperties" of cd "Somatic"
+        repeat with looper=100 down to 0 step -10
+            wait for 10 milliseconds with messages
+            set the blendLevel of grp "PSProperties" to looper
+            set the blendLevel of grc "Pointer" to looper
+         end repeat
+         set the CurrentPainSpot of grp "PSProperties"  to pCurrentPainSpot
+    end if
+end FadeInPSPropsPalette 
+ 
+
+
+command ToolsTouchStart
+   constant cNumTools = 7
+   put empty into gBackdropTouchDown
+   put the mouseLoc into lTL --the Touch Loc
+   if lTL is within the rect of grc "tab1" then
+      SetToolsPaletteStatus "painspots"
+      FadeInPainSpots
+      FadeOutDrawings
+      exit ToolsTouchStart
+   else
+      if lTL is within the rect of grc "tab2" then
+         SetToolsPaletteStatus "drawing"
+         FadeInDrawings
+         FadeOutPainSpots
+         deselectCurrentPainSpot
+         FadeOutPSPropsPalette
+         exit ToolsTouchStart
+      else
+         if lTL is within the rect of grc "tab3" then
+            SetToolsPaletteStatus "moving"
+            FadeInDrawingsWithDropShadow
+            FadeInPainSpotsWithDropShadow
+            deselectCurrentPainSpot
+            FadeOutPSPropsPalette
+            exit ToolsTouchStart
+         end if
+      end if
+   end if
+   
+   if gShowFireObject is true then
+      put "nopain,cloud,ellipse,flash,itchy,spikes,slash,query,fire" into lToolTypes
+   else
+      put "nopain,cloud,ellipse,flash,itchy,spikes,slash,query" into lToolTypes
+   end if
+   
+   if gToolPaletteStatus is "painspots" then
+      repeat with looper=1 to (the number of items of lToolTypes) ---cNumTools
+         if lTL is within the rect of image (item looper of lToolTypes) then
+            put item looper of lToolTypes into lWhichTypeOfPainShape
+            if lWhichTypeOfPainShape is "nopain" then
+               put cNoPainID into lID
+            else
+               put gAnimations[lWhichTypeOfPainShape][cDefaultSize][1] into lID --get the ID of the default sized painspot of this type
+            end if
+            --  put the ID of image lWhichTypeOfPainShape into lID
+            clone btn "PainspotTMPL"
+            put "painSpot" & (the seconds) into lCurrentPS
+            set the name of it to lCurrentPS
+            
+            put lWhichTypeOfPainShape into gPainSpotPageArr[gCurrentPage][gCurrentView][lCurrentPS] --record this painspot type (though this bit of is only a placeholder)
+            
+            set the icon of btn lCurrentPS to lID
+            set the rect of btn lCurrentPS to the rect of image ID lID --our button needs to be the same size
+            set the loc of btn lCurrentPS to lTL
+            set the cpHOffset of btn lCurrentPS to 0 --it should follow the mouseloc at its centre
+            set the cpVOffset of btn lCurrentPS to 0
+            set the cpThrobRate of btn lCurrentPS to cDefaultThrobRate
+            set the cpSize of btn lCurrentPS to cDefaultSize
+            set the cpPSType of btn lCurrentPS to lWhichTypeOfPainShape
+            put lCurrentPS into gCurrentPainSpot
+            show btn lCurrentPS
+            if the visible of image "gremlin" is true then
+               move btn lCurrentPS to the loc of image "gremlin" in  20 ticks
+               hide image "gremlin"
+               --set the cpAttachedTo of btn lCurrentPS to the cpAttachedTo of image "gremlin" -- no longer done by CalculateImageOffset
+               --record the location offset for this pain spot.
+               --put lCurrentPS into gToMove --temporary 
+               set the cpAttachedTo of btn lCurrentPS to the cpAttachedTo of image "gremlin"
+               put CalculateImgOffset(lCurrentPS) into lOffset
+               set the cpLocOffset of btn lCurrentPS to lOffset
+               put empty into gToMove --now empty it
+               
+               if lWhichTypeOfPainShape is not "nopain" then
+                  InitPSPrefsAnimations (item looper of lToolTypes)
+                  SetAndHighlightCurrentPainSpot lCurrentPS
+                  PlacePSProperties
+                  send SetupPSLabel to grp "PSproperties"
+                  --put empty into fld "PSLabel" of grp "PSproperties"
+                  FadeInPSPropsPalette lCurrentPS
+                  AnimateBtn lCurrentPS
+               end if
+               
+               FlagCurrentPageAsDirty
+            else
+               deselectCurrentPainSpot
+               FadeOutPSPropsPalette
+               put lCurrentPS into gToMove
+            end if
+            exit repeat
+         end if
+      end repeat
+   else
+      if lTL is within the rect of grc "linewidthsection" then
+         put item 1 of lTL  - the left of grc "linewidthsection" into lDeltaH
+         put (the width of grc "linewidthsection") div cNumPenThicknessSettings into lSlotWidth
+         put min(cNumPenThicknessSettings,(lDeltaH div lSlotWidth) + 1) into lSlot --we now have a value 1..cNumPenThicknessSettings
+         --we use min() because if you tap on the the very edge of the hidden graphic, we would otherwise get a cNumPenThicknessSettings+1...
+         set the loc of grc "PenThicknessHighlight" to the loc of grc ("line" & lSlot)
+         set the lineSize of grc "DrawTemplateGraphic" to the linesize of grc ("line" & lSlot)
+      else
+         if (gEnableColourSwatches is false) and (lTL is within the rect of grp "ColourBlock" )then
+            put item 1 of lTL - the left of grp "ColourBlock" into lDeltaH --how far are we along the colour strip
+            put the width of grc "r1" of grp "ColourBlock" into lWidth
+            put (lDeltaH div lWidth) + 1 into lTheBlock
+            if there is grc ("r" & lTheBlock) of grp "ColourBlock"  then
+               SetDrawingColour ("r" & lTheBlock) 
+            end if
+         end if
+      end if
+   end if
+end ToolsTouchStart
+
+
+on ToolsTouchMove
+   put the mouseLoc into lTL --the Touch Loc
+   if (gEnableColourSwatches is false) and (lTL is within the rect of grp "ColourBlock") then
+      put item 1 of lTL - the left of grp "ColourBlock" into lDeltaH --how far are we along the colour strip
+      put the width of grc "r1" of grp "ColourBlock" into lWidth
+      put (lDeltaH div lWidth) + 1 into lTheBlock
+      if there is grc ("r" & lTheBlock) of grp "ColourBlock"  then
+         SetDrawingColour ("r" & lTheBlock) 
+      end if
+   end if
+end ToolsTouchMove
+
+
+on ToolsTouchEnd
+   
+end ToolsTouchEnd
+
+
+--
+--align the PS Properties group with a specific painspot
+--it will align with the current location of the painspot highlight graphic.
+
+command PlacePSProperties
+   constant cBodyHOffset = 90  --was 50
+   local lHoriz,lVert, lCurrentPainSpot
+   if gCurrentPainSpot is not empty then --do we have a painspot marked as current?
+      put gCurrentPainSpot into lCurrentPainSpot
+   else
+      if the visible of grp "PSProperties"  is true then --if not, is there one still in the properties palette (just before it goes away)
+         put the CurrentPainSpot of grp "PSProperties" into lCurrentPainSpot
+      else --no, we're trying to update the properties palette and we have no current pain spot. Just give up
+         exit PlacePSProperties
+      end if
+   end if
+   --deal with the horizontal location
+   
+   
+   -- ****************
+   -- ****************
+   -- ****************
+   --needs updating to cope with the new possibilities for cpAttachedTo
+   -- ****************
+   -- ****************
+   
+   
+   
+   if gCurrentView is "FrontAndBack" then
+      if gShowTwoViews is true then
+         if the cpAttachedTo of btn lCurrentPainSpot is "front" then
+            --its on the front view
+            --align it with the back
+            set the loc of grp "PSproperties" to the loc of image "back"
+            set the points of grc "Pointer" to GetPointsForPSPropsPointer("right")
+         else
+            --its on the back, align with the front
+            set the loc of grp "PSproperties" to the loc of image "front"
+            set the points of grc "Pointer" to GetPointsForPSPropsPointer("left")    
+         end if
+      else
+         set the left of grp "PSproperties" to the right of image "front" + cBodyHOffset
+         set the points of grc "Pointer" to GetPointsForPSPropsPointer("right")
+         --    end if
+      end if
+   else --it's based a single zoomed view - push the props palette over to the far left or right.
+      if (item 1 of the loc of grc "PSHighlight") < (item 1 of the loc of img "ZoomImage") then
+         set the right of grp "PSproperties" to the right of grp "ZoomPalette" - 10
+         set the points of grc "Pointer" to GetPointsForPSPropsPointer("right")
+      else
+         set the left of grp "PSproperties" to the left of grp "Toolset" + 10
+         set the points of grc "Pointer" to GetPointsForPSPropsPointer("left")
+      end if
+   end if
+   
+   if gKeyboardOnShow is true then
+      set the top of grp "PSproperties" to the bottom of grp "face1" -- the first label field should do.
+   else
+      if item 2 of the loc of btn lCurrentPainSpot > (item 2 of the loc of image "front") then --the pain spot is in the bottom half
+         set the bottom of grp "PSproperties" to the bottom of grc "PSHighlight"
+      else
+         set the top of grp "PSproperties" to the top of grc "PSHighlight"
+      end if
+   end if
+   set the layer of grc "Pointer" to top
+   set the layer of grp "PSproperties" to top
+end PlacePSProperties
+  
+    
+function GetPointsForPSPropsPointer pLeftOrRight
+   if pLeftOrRight is "right" then
+      put  (the left of grp "PSproperties") + 4 & "," & (item 2 of the loc of grc "PSHighlight") + 5 & return & \
+            (the right of grc "PSHighlight") + 2 & "," &  (item 2 of the loc of grc "PSHighlight") + 2 & return & \
+            (the right of grc "PSHighlight") + 2 & "," & (item 2 of the loc of grc "PSHighlight") - 2  & return & \
+            (the left of grp "PSproperties") + 4 & "," & (item 2 of the loc of grc "PSHighlight") - 20 & return & \
+            (the left of grp "PSproperties") + 4 & "," & (item 2 of the loc of grc "PSHighlight") + 5 into lPoints
+   else
+      put  (the right of grp "PSproperties") - 4 & "," & (item 2 of the loc of grc "PSHighlight") + 5 & return & \
+            (the left of grc "PSHighlight") - 2 & "," &  (item 2 of the loc of grc "PSHighlight") + 2 & return & \
+            (the left of grc "PSHighlight") - 2 & "," & (item 2 of the loc of grc "PSHighlight") - 2  & return & \
+            (the right of grp "PSproperties") - 4 & "," & (item 2 of the loc of grc "PSHighlight") - 20 & return & \
+            (the right of grp "PSproperties") - 4 & "," & (item 2 of the loc of grc "PSHighlight") + 5 into lPoints
+   end if
+   return lPoints
+end GetPointsForPSPropsPointer
+   
+
+  
+on DoStuffBeforeWeLeaveThisCard
+   --take a screenshot and record the current pages
+   --we need to process any "page" that we have modified.
+   
+   QuicklyHidePSPropsPaletteAndDeselectCurrentPainSpot
+   focus on nothing
+   wait for 5 ticks with messages
+   hide image "gremlin" of cd "Somatic"
+   
+   FadeInDrawings
+   FadeInPainSpots
+   
+   --save everything
+   SaveCurrentPageAndViewPainSpotInfo
+   SaveCurrentPageAndViewDrawingInfo
+   put gCurrentEmotion into gPageEmotionArr[gCurrentPage] --only one of these per page (other views don't have emotions)
+   --   put gShowTwoViews into TempShowTwoViews
+   
+   --if the page is dirty we need to screenshot it
+   if gPageDirtyFlagArr[gCurrentPage][gCurrentView] is true then
+      
+      --      if gShowTwoViews is false then --if we've got the single-body view we need to show both so we can see all the pain spots.
+      --         if the visible of image "ZoomImage" of cd "Somatic" is false then --we were showing the body views, one-up. screenshot two-up
+      --            put true into gShowTwoViews
+      --         end if
+      --         DrawBodyViews
+      --         PlaceEmotion gCurrentEmotion
+      --         DrawAllPainSpots
+      --         DrawAllDrawings
+      --         hide grc "PSHighlight" --in case that was in position from the one-up view.
+      --         wait for 10 ticks with messages --give everything a chance to get drawn.
+      --         TakeScreenShot
+      --         SavePageAndViewData gCurrentView
+      --         put TempShowTwoViews into gShowTwoViews --when we come back we'll be back to one-up view again.
+      --      else
+      TakeScreenShot
+      SavePageAndViewData gCurrentView, true --write out the data to a file
+      --   end if
+      delete global gPageDirtyFlagArr[gCurrentPage][gCurrentView]
+   end if
+end DoStuffBeforeWeLeaveThisCard
+  
+  
+  
+on FlagCurrentPageAsDirty
+   put true into gPageDirtyFlagArr[gCurrentPage][gCurrentView] --record that something has changed and needs to be recorded
+end FlagCurrentPageAsDirty
+
+  
+on faceclick pWhichFace
+   global gEmotPaletteConfig
+   if gCurrentView is "frontAndBack" then
+      if (gEmotPaletteConfig is "open") and ((gShowTwoViews is true) or ((gShowTwoViews is false) and (gShowWhichSingleBodyView is "front"))) then
+         pass faceclick
+      end if
+   end if
+end faceclick
+ 
+ 
+command HideOrShowEmotionsPalette pStatus
+   global gEmotPaletteStatus, gEmotPaletteConfig
+   if pStatus is "hide" then
+      put false into tVisibleState
+   else
+      put true into tVisibleState
+   end if
+   set lockscreen to true
+   repeat for each item theface in gEmotPaletteStatus
+      put ("face" & theface) into lGrpName
+      put ("label" & theface) into lLblName
+      set the visible of group lGrpName to tVisibleState
+      hide fld lLblName
+   end repeat
+   set the visible of grc "EmotionsPaletteHolder" to tVisibleState
+   hide grp "EmotPalOpen"
+   hide grp "EmotPalClose"
+   hide image "CompactEmotPalette"
+   hide image "face1"
+   
+   if pStatus is "show" then
+      if gEmotPaletteConfig is "compact" then
+         hide image "face1"
+         show image "CompactEmotPalette"
+         show grp "EmotPalOpen"
+         hide grp "EmotPalClose"
+         
+      else
+         repeat for each item theface in gEmotPaletteStatus
+            put ("label" & theface) into lLblName
+            show fld lLblName
+         end repeat
+         
+         hide image "CompactEmotPalette"
+         show image "face1"
+         hide grp "EmotPalOpen"
+         show grp "EmotPalClose"
+      end if
+   end if
+   set lockscreen to false
+end HideOrShowEmotionsPalette
+ 
+ 
+ 
+on FancyDrawEmotionPalette pStatus
+   constant cFaceOffset = 7
+   global gEmotPaletteStatus, gEmotPaletteConfig
+   global gEmotionLabelsArr
+   local lTheLeft,lTheTop, lGrpName
+   put the width of group "face1" into lFaceWidth
+   put lFaceWidth div 2 into lHalfFaceWidth
+   put (the height of group "face1") into lFaceHeight
+   put lFaceHeight div 2 into lHalfFaceHeight
+   if pStatus contains "compact" then
+      hide grc "EmotionsPaletteHolder" 
+      hide grp "EmotPalClose"
+      put the left of button "EmotStorage" into lTheLeft
+      put the top of button "EmotStorage" into lTheTop
+      repeat for each item theface in gEmotPaletteStatus
+         put ("face" & theface) into lGrpName
+         put ("label" & theface) into lLblName
+         if pStatus contains "animate" then
+            move group lGrpName to lTheLeft+lHalfFaceWidth,lTheTop+lHalfFaceHeight in 15 ticks without waiting
+         else
+            set the topleft of group lGrpName to lTheLeft,lTheTop
+         end if
+         add cFaceOffset to lTheLeft
+         if there is a field lLblName then
+            hide fld lLblName
+         end if
+      end repeat
+      set the width of grc "EmotionsPaletteHolder" to lFaceWidth + ((the number of items of gEmotPaletteStatus - 1) * cFaceOffset) + 10
+      set the height of grc "EmotionsPaletteHolder" to lFaceHeight + 8
+      set the left of grc "EmotionsPaletteHolder" to the left of btn "EmotStorage" - 4
+      set the top of grc "EmotionsPaletteHolder" to the top of btn "EmotStorage" - 4
+      set the left of grp "EmotPalOpen" to the right of grc "EmotionsPaletteHolder" - 5
+      set the top of grp "EmotPalOpen" to the top of grc "EmotionsPaletteHolder" + 4
+      
+      hide image "face1"
+      --set the loc of image "CompactEmotPalette" to the loc of grp "face1"
+      show image "CompactEmotPalette"
+      ShowNavigationButtons
+      put "compact" into gEmotPaletteConfig
+   else
+      --we're opening the palette.
+      hide grc "EmotionsPaletteHolder" 
+      hide grp "EmotPalOpen"
+      hide image "CompactEmotPalette"
+      show image "face1"
+      HIdeNavigationButtons
+      --      put (the width of this stack) div 2 into lHoriz
+      --      put  15 into lVert
+      --      set the loc of btn "facealign" to lHoriz,lVert
+      put round(((the number of items of gEmotPaletteStatus) * lFaceWidth) / 2) into lHalfWidth
+      put (item 1 of the loc of btn "facealign") - lHalfWidth into lLeft
+      put item 2 of the loc of btn "facealign" into lTop
+      put the height of fld "label1" into lLabelHeight
+      put lLabelHeight div 2 into lHalfLabelHeight
+      repeat for each item theface in gEmotPaletteStatus
+         put "label" & theface into LabelName
+         put "face" & theface  into FaceName
+         set the width of fld LabelName to lFaceWidth --the width of group face1
+         set the topleft of fld LabelName to the bottomleft of grp FaceName
+         put gEmotionLabelsArr[theface] into fld LabelName --put empty into it, or the name we typed.
+         show fld LabelName
+         if pStatus contains "animate" then 
+            move group FaceName to lLeft+lHalfFaceWidth,lTop+lHalfFaceHeight in 15 ticks without waiting
+            move fld LabelName to lLeft+lHalfFaceWidth,lTop+lFaceHeight + 2 + lHalfLabelHeight in 15 ticks without waiting
+         else
+            set the loc of group FaceName to lLeft+lHalfFaceWidth,lTop+lHalfFaceHeight 
+            set the loc of fld LabelName to lLeft+lHalfFaceWidth,lTop+lFaceHeight + 2 + lHalfLabelHeight
+         end if
+         add lFaceWidth to lLeft
+      end repeat
+      wait for 0 seconds with messages
+      repeat for each item theface in gEmotPaletteStatus
+         set the currentLoc of group ("face" & theface) to the loc of group ("face" & theface)
+         if there is a fld ("label" & theface) then
+            set the currentLoc of field ("label" & theface) to the loc of field ("label" & theface)
+         end if
+      end repeat
+      set the width of grc "EmotionsPaletteHolder" to ((the number of items of gEmotPaletteStatus) * lFaceWidth) + 6
+      set the height of grc "EmotionsPaletteHolder" to lFaceHeight + lLabelHeight + 10
+      set the loc of grc "EmotionsPaletteHolder" to the loc of btn "facealign"
+      set the top of grc "EmotionsPaletteHolder" to the top of btn "facealign" + 8
+      set the left of grp "EmotPalClose" to the right of grc "EmotionsPaletteHolder" - 4
+      set the top of grp "EmotPalClose" to the top of grc "EmotionsPaletteHolder" + 4
+      put "open" into gEmotPaletteConfig
+   end if
+end FancyDrawEmotionPalette
+
+
+on MoveStopped
+   global gEmotPaletteConfig
+   show grc "EmotionsPaletteHolder" 
+   if gEmotPaletteConfig is "open" then
+      show grp "EmotPalClose"
+   else
+      show grp "EmotPalOpen"
+   end if
+end MoveStopped
+
+
+on HIdeNavigationButtons
+   hide grp "PreviousPage"
+   hide grp "NextPage"
+   hide grp "NewPage"
+   hide fld "Description"
+end HIdeNavigationButtons
+
+
+on ShowNavigationButtons
+   if gCurrentPage > 1 then
+      show grp "PreviousPage"
+   end if
+   if gCurrentPage < gPageCount then
+      show grp "NextPage"
+   end if
+   show grp "NewPage"
+   show fld "Description"
+end ShowNavigationButtons
+

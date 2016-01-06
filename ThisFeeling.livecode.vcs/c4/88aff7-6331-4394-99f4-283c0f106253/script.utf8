@@ -1,0 +1,3 @@
+on touchend
+   FancyDrawEmotionPalette  "animate compact"
+end touchend

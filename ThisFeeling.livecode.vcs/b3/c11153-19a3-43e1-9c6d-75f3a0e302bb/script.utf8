@@ -1,0 +1,25 @@
+on touchEnd
+   global gCurrentPainSpot
+   if the visible of group "SomaticPrefs" is true then --if it's already on show - hide it
+      hide group "SomaticPrefs"
+   else
+      if gCurrentPainSpot is not empty then
+         FadeOutPSPropsPalette
+         hide grc "PSHighlight"
+         put empty into gCurrentPainSpot
+      end if
+      initSomaticPrefs
+      set the layer of group "SomaticPrefs" to top --so it lies on top of any objects we've created
+      show group "SomaticPrefs"
+   end if
+end touchEnd
+
+on mouseUp
+   if not mob() then
+      send "touchEnd" to me
+   end if
+end mouseUp
+
+on TouchStart
+   --don't do anything
+end TouchStart

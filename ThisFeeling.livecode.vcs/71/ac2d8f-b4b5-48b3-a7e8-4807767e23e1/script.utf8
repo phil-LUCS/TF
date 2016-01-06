@@ -1,0 +1,7 @@
+global gCurrentView
+
+on touchend
+   if gCurrentView is "FrontAndBack" then
+      FancyDrawEmotionPalette "animate"
+   end if
+end touchend
